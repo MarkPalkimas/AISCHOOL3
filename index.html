@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI School - Intelligent Learning Platform</title>
+    <meta name="description" content="Transform education with AI-powered learning. Teachers upload materials, students get instant, personalized answers.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles/main.css">
+    
+    <!-- Clerk Authentication -->
+    <script src="https://unpkg.com/@clerk/clerk-js@5/dist/clerk.browser.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <div class="nav-content">
+                <!-- Logo -->
+                <div class="nav-logo">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <span class="logo-text">AI School</span>
+                </div>
+                
+                <!-- Navigation Links -->
+                <div class="nav-links">
+                    <a href="#features" class="nav-link">Features</a>
+                    <a href="#how-it-works" class="nav-link">How it Works</a>
+                </div>
+                
+                <!-- User Section -->
+                <div class="nav-user">
+                    <!-- User Info (hidden by default) -->
+                    <div id="user-info" class="user-info hidden">
+                        <img id="user-avatar" class="user-avatar" src="" alt="User">
+                        <span id="user-name" class="user-name"></span>
+                        <div class="user-menu">
+                            <button id="sign-out-btn" class="btn btn-ghost">Sign out</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Sign In Button -->
+                    <button id="sign-in-btn" class="btn btn-primary">
+                        Sign in
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <span class="badge-text">Introducing AI-Powered Education</span>
+                        <div class="badge-icon">
+                            <svg viewBox="0 0 12 12" fill="currentColor">
+                                <path d="M3.5 5L6 7.5L8.5 5"/>
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <h1 class="hero-title">
+                        The future of<br>
+                        <span class="gradient-text">intelligent learning</span>
+                    </h1>
+                    
+                    <p class="hero-description">
+                        Transform your classroom with AI. Teachers upload course materials, students get instant, 
+                        personalized answers from an AI tutor that knows your curriculum inside and out.
+                    </p>
+                    
+                    <div class="hero-buttons">
+                        <button id="teacher-cta" class="btn btn-large btn-primary">
+                            Start as Teacher
+                            <svg viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 0L6.6 1.4 12.2 7H0v2h12.2L6.6 14.6 8 16l8-8-8-8z"/>
+                            </svg>
+                        </button>
+                        <button id="student-cta" class="btn btn-large btn-secondary">
+                            Join as Student
+                            <svg viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 0L6.6 1.4 12.2 7H0v2h12.2L6.6 14.6 8 16l8-8-8-8z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="hero-visual">
+                    <div class="visual-container">
+                        <div class="floating-card card-1">
+                            <div class="card-icon teacher">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 14l9-5-9-5-9 5 9 5z M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+                                </svg>
+                            </div>
+                            <span>Upload Materials</span>
+                        </div>
+                        
+                        <div class="floating-card card-2">
+                            <div class="card-icon student">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                                </svg>
+                            </div>
+                            <span>AI Answers</span>
+                        </div>
+                        
+                        <div class="floating-card card-3">
+                            <div class="card-icon ai">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                </svg>
+                            </div>
+                            <span>Smart Learning</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="features">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">Built for modern education</h2>
+                    <p class="section-description">
+                        Powerful AI tools designed specifically for teachers and students
+                    </p>
+                </div>
+                
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Instant Upload</h3>
+                        <p class="feature-description">
+                            Upload PDFs, documents, and course materials. Our AI processes everything instantly.
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Easy Access</h3>
+                        <p class="feature-description">
+                            Students join with a simple class code. No complicated setup or installations.
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Smart Responses</h3>
+                        <p class="feature-description">
+                            Get intelligent answers based on your specific course content and curriculum.
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Personalized Learning</h3>
+                        <p class="feature-description">
+                            Each student gets a tailored experience based on their questions and progress.
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Always Available</h3>
+                        <p class="feature-description">
+                            24/7 AI tutoring means students can get help whenever they need it most.
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Context Aware</h3>
+                        <p class="feature-description">
+                            The AI understands your course structure, assignments, and learning objectives.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section id="how-it-works" class="how-it-works">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">How AI School works</h2>
+                    <p class="section-description">
+                        Get started in three simple steps
+                    </p>
+                </div>
+                
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3 class="step-title">Teachers upload content</h3>
+                            <p class="step-description">
+                                Upload syllabi, lecture notes, textbooks, and any course materials. 
+                                Our AI instantly processes and understands your content.
+                            </p>
+                        </div>
+                        <div class="step-visual">
+                            <div class="upload-animation">
+                                <div class="upload-icon">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3 class="step-title">Students join with a code</h3>
+                            <p class="step-description">
+                                Share a simple class code with your students. They can join instantly 
+                                and access their personalized AI learning assistant.
+                            </p>
+                        </div>
+                        <div class="step-visual">
+                            <div class="code-display">
+                                <span class="class-code">ABC123</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3 class="step-title">AI provides smart answers</h3>
+                            <p class="step-description">
+                                Students ask questions and receive intelligent, context-aware responses 
+                                based on your specific course materials and curriculum.
+                            </p>
+                        </div>
+                        <div class="step-visual">
+                            <div class="chat-preview">
+                                <div class="chat-bubble student">
+                                    What is the main theme of Chapter 3?
+                                </div>
+                                <div class="chat-bubble ai">
+                                    Based on your course materials, Chapter 3 focuses on...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Student Code Modal -->
+    <div id="student-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Join Your Class</h3>
+                <p class="modal-description">Enter the class code provided by your teacher</p>
+                <button id="modal-close" class="modal-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="teacher-code"
+                        class="input-code"
+                        placeholder="Enter class code"
+                        maxlength="10"
+                    >
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="cancel-student" class="btn btn-secondary">
+                        Cancel
+                    </button>
+                    <button id="join-class" class="btn btn-primary">
+                        <span id="join-text">Join Class</span>
+                        <div id="join-loading" class="loading-spinner hidden"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/auth.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

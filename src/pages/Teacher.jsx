@@ -58,7 +58,7 @@ function Teacher() {
 
         <SignedIn>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Upload Materials Card */}
+            {/* Upload Materials */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="flex items-center mb-4">
                 <div className="w-10 h-10 bg-openai-100 rounded-lg flex items-center justify-center mr-3">
@@ -76,7 +76,7 @@ function Teacher() {
               </button>
             </div>
 
-            {/* AI Assistant Settings */}
+            {/* AI Settings */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="flex items-center mb-4">
                 <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">

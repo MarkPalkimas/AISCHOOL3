@@ -389,4 +389,10 @@ class AISchoolApp {
 }
 
 // Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoade
+document.addEventListener('DOMContentLoaded', () => {
+    const app = new AISchoolApp();
+    app.initialize();
+});
+
+// Export for use in other modules
+window.AISchoolApp = AISchoolApp;

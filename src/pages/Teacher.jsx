@@ -1,25 +1,39 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, UserButton, SignInButton, useUser } from '@clerk/clerk-react'
+import { useClass } from '../context/ClassContext'
 
 function Teacher() {
+  const { user } = useUser()
+  const { createClass, getTeacherClasses } = useClass()
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [className, setClassName] = useState('')
+  const [newClassCode, setNewClassCode] = useState(null)
+
+  const handleCreateClass = () => {
+    if (!className.trim() || !user) return
+    const code = createClass(user.id, className)
+    setNewClassCode(code)
+    setClassName('')
+  }
+
+  const teacherClasses = user ? getTeacherClasses(user.id) : []
+
   return (
     <div style={{ minHeight: '100vh', background: 'white' }}>
       {/* Navigation */}
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            <div style={{ 
-              width: '32px', 
-              height: '32px', 
-              background: '#3B82F6', 
-              borderRadius: '6px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <span style={{ color: 'white', fontWeight: '700', fontSize: '18px' }}>C</span>
-            </div>
+            <img 
+              src="/Logo.jpg" 
+              alt="ClassAI Logo" 
+              style={{ 
+                width: '32px', 
+                height: '32px', 
+                objectFit: 'contain'
+              }} 
+            />
             <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
           </Link>
           
@@ -101,7 +115,7 @@ function Teacher() {
                 margin: '0 auto 24px'
               }}>
                 <svg style={{ width: '32px', height: '32px', color: '#6B7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-22v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
               <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '12px' }}>
@@ -120,6 +134,52 @@ function Teacher() {
         </SignedOut>
 
         <SignedIn>
+          {/* Create Class Button */}
+          <div style={{ marginBottom: '48px', textAlign: 'center' }}>
+            <button 
+              onClick={() => setShowCreateModal(true)}
+              className="btn-primary"
+              style={{ padding: '16px 32px', fontSize: '18px' }}
+            >
+              <svg style={{ width: '20px', height: '20px', marginRight: '8px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create New Class
+            </button>
+          </div>
+
+          {/* My Classes */}
+          {teacherClasses.length > 0 && (
+            <div style={{ marginBottom: '48px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '24px' }}>
+                My Classes
+              </h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' }}>
+                {teacherClasses.map((classData) => (
+                  <div key={classData.code} className="feature-card">
+                    <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', marginBottom: '12px' }}>
+                      {classData.className}
+                    </h3>
+                    <div style={{ 
+                      background: '#F3F4F6', 
+                      padding: '12px', 
+                      borderRadius: '8px',
+                      marginBottom: '12px'
+                    }}>
+                      <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Class Code</p>
+                      <p style={{ fontSize: '24px', fontWeight: '700', color: '#3B82F6', letterSpacing: '2px' }}>
+                        {classData.code}
+                      </p>
+                    </div>
+                    <p style={{ fontSize: '14px', color: '#6B7280' }}>
+                      {classData.students?.length || 0} students enrolled
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Feature Cards Grid */}
           <div style={{ 
             display: 'grid', 
@@ -178,7 +238,7 @@ function Teacher() {
                 <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>AI Configuration</h3>
               </div>
               <p style={{ color: '#6B7280', marginBottom: '24px', lineHeight: '1.6' }}>
-                Configure your AI assistant's behavior, personality, and generate student access codes for your classes.
+                Configure your AI assistant's behavior, personality, and customize settings for each class.
               </p>
               <button className="btn-disabled" disabled>
                 <svg style={{ width: '16px', height: '16px', marginRight: '8px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -311,6 +371,142 @@ function Teacher() {
           </div>
         </SignedIn>
       </div>
+
+      {/* Create Class Modal */}
+      {showCreateModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '100%'
+          }}>
+            {!newClassCode ? (
+              <>
+                <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>
+                  Create New Class
+                </h2>
+                <p style={{ color: '#6B7280', marginBottom: '24px' }}>
+                  Give your class a name and we'll generate a unique code for your students.
+                </p>
+                
+                <div style={{ marginBottom: '24px' }}>
+                  <label htmlFor="className" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                    Class Name
+                  </label>
+                  <input
+                    type="text"
+                    id="className"
+                    value={className}
+                    onChange={(e) => setClassName(e.target.value)}
+                    placeholder="e.g., Math 101, Biology Advanced"
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '16px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#3B82F6'
+                      e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#D1D5DB'
+                      e.target.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    onClick={() => {
+                      setShowCreateModal(false)
+                      setClassName('')
+                    }}
+                    className="btn-secondary"
+                    style={{ flex: 1 }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateClass}
+                    disabled={!className.trim()}
+                    className="btn-primary"
+                    style={{ 
+                      flex: 1,
+                      opacity: !className.trim() ? '0.5' : '1',
+                      cursor: !className.trim() ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    Create Class
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ 
+                    width: '64px', 
+                    height: '64px', 
+                    background: '#DEF7EC', 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    margin: '0 auto 24px'
+                  }}>
+                    <svg style={{ width: '32px', height: '32px', color: '#059669' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '12px' }}>
+                    Class Created Successfully!
+                  </h2>
+                  <p style={{ color: '#6B7280', marginBottom: '24px' }}>
+                    Share this code with your students so they can join your class.
+                  </p>
+                  
+                  <div style={{ 
+                    background: '#F3F4F6', 
+                    padding: '24px', 
+                    borderRadius: '8px',
+                    marginBottom: '24px'
+                  }}>
+                    <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Class Code</p>
+                    <p style={{ fontSize: '36px', fontWeight: '700', color: '#3B82F6', letterSpacing: '4px' }}>
+                      {newClassCode}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setShowCreateModal(false)
+                      setNewClassCode(null)
+                    }}
+                    className="btn-primary"
+                    style={{ width: '100%' }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

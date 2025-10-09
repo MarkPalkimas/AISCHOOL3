@@ -1,20 +1,37 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, UserButton, SignInButton, useUser } from '@clerk/clerk-react'
+import { useClass } from '../context/ClassContext'
 
 function Student() {
+  const { user } = useUser()
+  const { joinClass } = useClass()
   const [teacherCode, setTeacherCode] = useState('')
   const [isCodeSubmitted, setIsCodeSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [joinedClassName, setJoinedClassName] = useState('')
 
   const handleCodeSubmit = async (e) => {
     e.preventDefault()
-    if (!teacherCode.trim()) return
+    if (!teacherCode.trim() || !user) return
     
     setIsLoading(true)
+    setError('')
+    
+    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    const result = joinClass(user.id, teacherCode)
+    
     setIsLoading(false)
-    setIsCodeSubmitted(true)
+    
+    if (result.success) {
+      setJoinedClassName(result.className)
+      setIsCodeSubmitted(true)
+    } else {
+      setError(result.error)
+    }
   }
 
   return (
@@ -23,17 +40,15 @@ function Student() {
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            <div style={{ 
-              width: '32px', 
-              height: '32px', 
-              background: '#3B82F6', 
-              borderRadius: '6px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <span style={{ color: 'white', fontWeight: '700', fontSize: '18px' }}>C</span>
-            </div>
+            <img 
+              src="/Logo.jpg" 
+              alt="ClassAI Logo" 
+              style={{ 
+                width: '32px', 
+                height: '32px', 
+                objectFit: 'contain'
+              }} 
+            />
             <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
           </Link>
           
@@ -127,12 +142,15 @@ function Student() {
                       type="text"
                       id="teacherCode"
                       value={teacherCode}
-                      onChange={(e) => setTeacherCode(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        setTeacherCode(e.target.value.toUpperCase())
+                        setError('')
+                      }}
                       placeholder="Enter your teacher's code (e.g., ABC123)"
                       style={{
                         width: '100%',
                         padding: '12px 16px',
-                        border: '1px solid #D1D5DB',
+                        border: error ? '1px solid #DC2626' : '1px solid #D1D5DB',
                         borderRadius: '6px',
                         fontSize: '16px',
                         boxSizing: 'border-box',
@@ -140,15 +158,24 @@ function Student() {
                         transition: 'border-color 0.2s, box-shadow 0.2s'
                       }}
                       onFocus={(e) => {
-                        e.target.style.borderColor = '#3B82F6'
-                        e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                        if (!error) {
+                          e.target.style.borderColor = '#3B82F6'
+                          e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                        }
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#D1D5DB'
-                        e.target.style.boxShadow = 'none'
+                        if (!error) {
+                          e.target.style.borderColor = '#D1D5DB'
+                          e.target.style.boxShadow = 'none'
+                        }
                       }}
                       disabled={isLoading}
                     />
+                    {error && (
+                      <p style={{ color: '#DC2626', fontSize: '14px', marginTop: '8px' }}>
+                        {error}
+                      </p>
+                    )}
                   </div>
                   
                   <button
@@ -220,7 +247,7 @@ function Student() {
                   Welcome to <span style={{ color: '#3B82F6' }}>ClassAI!</span>
                 </h1>
                 <p className="hero-subtitle">
-                  You're now connected to your teacher's AI assistant for class: <span style={{ fontWeight: '700', color: '#111827' }}>{teacherCode}</span>
+                  You're now connected to <span style={{ fontWeight: '700', color: '#111827' }}>{joinedClassName}</span> (Code: <span style={{ fontWeight: '700', color: '#111827' }}>{teacherCode}</span>)
                 </p>
               </div>
 
@@ -251,6 +278,7 @@ function Student() {
                     onClick={() => {
                       setIsCodeSubmitted(false)
                       setTeacherCode('')
+                      setError('')
                     }}
                     className="btn-secondary"
                   >

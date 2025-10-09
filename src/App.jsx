@@ -54,6 +54,7 @@ function HomePage() {
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
+            {/* Top-left logo */}
             <img 
               src="/Logo.jpg" 
               alt="ClassAI Logo" 
@@ -125,11 +126,7 @@ function HomePage() {
       {/* Features Section */}
       <div style={{ padding: '80px 24px', background: '#F9FAFB' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-            gap: '32px' 
-          }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px' }}>
             <div className="feature-card">
               <div className="feature-icon">
                 <svg width="24" height="24" fill="none" stroke="#3B82F6" strokeWidth="2" viewBox="0 0 24 24">
@@ -182,11 +179,7 @@ function HomePage() {
             <img 
               src="/Logo.jpg" 
               alt="ClassAI Logo" 
-              style={{ 
-                width: '24px', 
-                height: '24px', 
-                objectFit: 'contain'
-              }} 
+              style={{ width: '24px', height: '24px', objectFit: 'contain' }} 
             />
             <span style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>ClassAI</span>
           </div>

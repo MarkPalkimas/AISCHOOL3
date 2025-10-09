@@ -45,7 +45,7 @@ function Teacher() {
             </SignedOut>
             <SignedIn>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '14px', color: '#6B7280', display: 'none' }} className="welcome-text">Welcome back!</span>
+                <span className="welcome-text" style={{ fontSize: '14px', color: '#6B7280' }}>Welcome back!</span>
                 <UserButton afterSignOutUrl="/" />
               </div>
             </SignedIn>
@@ -72,17 +72,24 @@ function Teacher() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
           </div>
-          <h1 className="hero-title" style={{ marginBottom: '16px' }}>
+          <h1 style={{ fontSize: '48px', fontWeight: '800', color: '#111827', lineHeight: '1.2', marginBottom: '16px' }}>
             Teacher <span style={{ color: '#3B82F6' }}>Dashboard</span>
           </h1>
-          <p className="hero-subtitle">
+          <p style={{ fontSize: '20px', color: '#6B7280', lineHeight: '1.6', maxWidth: '800px', margin: '0 auto' }}>
             Welcome to your ClassAI dashboard. Upload your class materials and create AI-powered learning experiences for your students.
           </p>
         </div>
 
         <SignedOut>
           <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-            <div className="feature-card" style={{ textAlign: 'center' }}>
+            <div style={{ 
+              background: 'white',
+              border: '1px solid #E5E7EB',
+              borderRadius: '12px',
+              padding: '32px',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+              textAlign: 'center'
+            }}>
               <div style={{ 
                 width: '64px', 
                 height: '64px', 
@@ -123,7 +130,7 @@ function Teacher() {
             {/* Upload Materials */}
             <div className="feature-card hover-card">
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-                <div className="feature-icon" style={{ 
+                <div style={{ 
                   width: '48px', 
                   height: '48px', 
                   background: 'linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%)', 
@@ -153,7 +160,7 @@ function Teacher() {
             {/* AI Settings */}
             <div className="feature-card hover-card">
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-                <div className="feature-icon" style={{ 
+                <div style={{ 
                   width: '48px', 
                   height: '48px', 
                   background: 'linear-gradient(135deg, #E9D5FF 0%, #D8B4FE 100%)', 
@@ -184,7 +191,7 @@ function Teacher() {
             {/* Student Access */}
             <div className="feature-card hover-card">
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-                <div className="feature-icon" style={{ 
+                <div style={{ 
                   width: '48px', 
                   height: '48px', 
                   background: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)', 
@@ -214,17 +221,17 @@ function Teacher() {
             {/* Analytics */}
             <div className="feature-card hover-card">
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-                <div className="feature-icon" style={{ 
+                <div style={{ 
                   width: '48px', 
                   height: '48px', 
-                  background: 'linear-gradient(135deg, #FED7AA 0%, #FCA5A5 100%)', 
+                  background: 'linear-gradient(135deg, #FED7AA 0%, #FDBA74 100%)', 
                   borderRadius: '12px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginRight: '16px'
                 }}>
-                  <svg style={{ width: '24px', height: '24px', color: '#DC2626' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg style={{ width: '24px', height: '24px', color: '#EA580C' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
@@ -250,7 +257,7 @@ function Teacher() {
             borderLeft: '4px solid #3B82F6',
             borderRadius: '12px'
           }}>
-            <div style={{ display: 'flex', gap: '24px' }}>
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
               <div style={{ flexShrink: 0 }}>
                 <div style={{ 
                   width: '40px', 

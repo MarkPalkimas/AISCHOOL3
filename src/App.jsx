@@ -54,17 +54,15 @@ function HomePage() {
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            <div style={{ 
-              width: '32px', 
-              height: '32px', 
-              background: '#3B82F6', 
-              borderRadius: '6px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <span style={{ color: 'white', fontWeight: '700', fontSize: '18px' }}>C</span>
-            </div>
+            <img 
+              src="/Logo.jpg" 
+              alt="ClassAI Logo" 
+              style={{ 
+                width: '32px', 
+                height: '32px', 
+                objectFit: 'contain'
+              }} 
+            />
             <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
           </Link>
           
@@ -181,17 +179,15 @@ function HomePage() {
       <footer style={{ borderTop: '1px solid #E5E7EB', padding: '40px 24px', textAlign: 'center' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ 
-              width: '24px', 
-              height: '24px', 
-              background: '#3B82F6', 
-              borderRadius: '4px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>C</span>
-            </div>
+            <img 
+              src="/Logo.jpg" 
+              alt="ClassAI Logo" 
+              style={{ 
+                width: '24px', 
+                height: '24px', 
+                objectFit: 'contain'
+              }} 
+            />
             <span style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>ClassAI</span>
           </div>
           <p style={{ color: '#6B7280', fontSize: '14px' }}>

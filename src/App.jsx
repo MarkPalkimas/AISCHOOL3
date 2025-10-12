@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Routes, Route, Link, useNavigate } from 'react-router-dom'
-import { SignedIn, SignedOut, UserButton, SignInButton, useUser } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/clerk-react'
 import Teacher from './pages/Teacher'
 import Student from './pages/Student'
 import ClassChat from './pages/ClassChat'

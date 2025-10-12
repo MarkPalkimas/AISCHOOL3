@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Routes, Route, Link, useNavigate } from 'react-router-dom'
-import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, UserButton, SignInButton, useUser } from '@clerk/clerk-react'
 import Teacher from './pages/Teacher'
 import Student from './pages/Student'
+import ClassChat from './pages/ClassChat'
 
 function RoleSelector({ onSelectRole, onClose }) {
   return (
@@ -10,7 +11,7 @@ function RoleSelector({ onSelectRole, onClose }) {
       <div className="bg-white rounded-lg p-8 max-w-md w-full">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to ClassAI</h2>
-          <p className="text-gray-600">Are you a teacher or student?</p>
+          <p className="text-gray-600">Choose your role to continue</p>
         </div>
         
         <div className="space-y-3">
@@ -54,7 +55,6 @@ function HomePage() {
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            {/* Top-left logo */}
             <img 
               src="/Logo.jpg" 
               alt="ClassAI Logo" 
@@ -206,6 +206,7 @@ function App() {
       <Route path="/" element={<HomePage />} />
       <Route path="/teacher" element={<Teacher />} />
       <Route path="/student" element={<Student />} />
+      <Route path="/class/:classCode" element={<ClassChat />} />
     </Routes>
   )
 }

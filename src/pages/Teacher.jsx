@@ -1,25 +1,79 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, UserButton, SignInButton, useUser } from '@clerk/clerk-react'
+import { getTeacherClasses, createClass, updateClassMaterials } from '../utils/storage'
 
 function Teacher() {
+  const { user } = useUser()
+  const [classes, setClasses] = useState([])
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [selectedClass, setSelectedClass] = useState(null)
+  const [newClassName, setNewClassName] = useState('')
+  const [newClassSubject, setNewClassSubject] = useState('')
+  const [materials, setMaterials] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      const teacherClasses = getTeacherClasses(user.id)
+      setClasses(teacherClasses)
+    }
+  }, [user])
+
+  const handleCreateClass = async (e) => {
+    e.preventDefault()
+    if (!newClassName.trim() || !user) return
+    
+    setIsCreating(true)
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    const newClass = createClass(user.id, newClassName, newClassSubject)
+    setClasses([...classes, newClass])
+    setNewClassName('')
+    setNewClassSubject('')
+    setShowCreateModal(false)
+    setIsCreating(false)
+  }
+
+  const handleUploadMaterials = async (e) => {
+    e.preventDefault()
+    if (!materials.trim() || !selectedClass) return
+    
+    setIsUploading(true)
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    updateClassMaterials(selectedClass.code, materials)
+    const updatedClasses = getTeacherClasses(user.id)
+    setClasses(updatedClasses)
+    setMaterials('')
+    setShowUploadModal(false)
+    setSelectedClass(null)
+    setIsUploading(false)
+  }
+
+  const openUploadModal = (classItem) => {
+    setSelectedClass(classItem)
+    setMaterials(classItem.materials || '')
+    setShowUploadModal(true)
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'white' }}>
       {/* Navigation */}
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            <div style={{ 
-              width: '32px', 
-              height: '32px', 
-              background: '#3B82F6', 
-              borderRadius: '6px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <span style={{ color: 'white', fontWeight: '700', fontSize: '18px' }}>C</span>
-            </div>
+            <img 
+              src="/Logo.jpg" 
+              alt="ClassAI Logo" 
+              style={{ 
+                width: '32px', 
+                height: '32px', 
+                objectFit: 'contain'
+              }} 
+            />
             <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
           </Link>
           
@@ -55,41 +109,18 @@ function Teacher() {
 
       {/* Main Content */}
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '80px 24px' }}>
-        {/* Header Section */}
-        <div style={{ textAlign: 'center', marginBottom: '64px' }}>
-          <div style={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            width: '80px', 
-            height: '80px', 
-            background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', 
-            borderRadius: '16px',
-            marginBottom: '24px',
-            boxShadow: '0 10px 25px rgba(59, 130, 246, 0.3)'
-          }}>
-            <svg style={{ width: '40px', height: '40px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-          </div>
-          <h1 style={{ fontSize: '48px', fontWeight: '800', color: '#111827', lineHeight: '1.2', marginBottom: '16px' }}>
-            Teacher <span style={{ color: '#3B82F6' }}>Dashboard</span>
-          </h1>
-          <p style={{ fontSize: '20px', color: '#6B7280', lineHeight: '1.6', maxWidth: '800px', margin: '0 auto' }}>
-            Welcome to your ClassAI dashboard. Upload your class materials and create AI-powered learning experiences for your students.
-          </p>
-        </div>
-
         <SignedOut>
+          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+            <h1 className="hero-title" style={{ marginBottom: '16px' }}>
+              Teacher <span style={{ color: '#3B82F6' }}>Dashboard</span>
+            </h1>
+            <p className="hero-subtitle">
+              Sign in to manage your classes and AI assistants
+            </p>
+          </div>
+
           <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-            <div style={{ 
-              background: 'white',
-              border: '1px solid #E5E7EB',
-              borderRadius: '12px',
-              padding: '32px',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-              textAlign: 'center'
-            }}>
+            <div className="feature-card" style={{ textAlign: 'center' }}>
               <div style={{ 
                 width: '64px', 
                 height: '64px', 
@@ -120,197 +151,300 @@ function Teacher() {
         </SignedOut>
 
         <SignedIn>
-          {/* Feature Cards Grid */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
-            gap: '24px',
-            marginBottom: '48px'
-          }}>
-            {/* Upload Materials */}
-            <div className="feature-card hover-card">
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-                <div style={{ 
-                  width: '48px', 
-                  height: '48px', 
-                  background: 'linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%)', 
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: '16px'
-                }}>
-                  <svg style={{ width: '24px', height: '24px', color: '#2563EB' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                </div>
-                <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>Upload Materials</h3>
-              </div>
-              <p style={{ color: '#6B7280', marginBottom: '24px', lineHeight: '1.6' }}>
-                Upload your syllabus, lecture notes, assignments, and readings to train your AI assistant with your course content.
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <h1 style={{ fontSize: '32px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>
+                My Classes
+              </h1>
+              <p style={{ color: '#6B7280' }}>
+                Manage your classes and AI assistants
               </p>
-              <button className="btn-disabled" disabled>
-                <svg style={{ width: '16px', height: '16px', marginRight: '8px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Coming Soon
-              </button>
             </div>
-
-            {/* AI Settings */}
-            <div className="feature-card hover-card">
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-                <div style={{ 
-                  width: '48px', 
-                  height: '48px', 
-                  background: 'linear-gradient(135deg, #E9D5FF 0%, #D8B4FE 100%)', 
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: '16px'
-                }}>
-                  <svg style={{ width: '24px', height: '24px', color: '#7C3AED' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>AI Configuration</h3>
-              </div>
-              <p style={{ color: '#6B7280', marginBottom: '24px', lineHeight: '1.6' }}>
-                Configure your AI assistant's behavior, personality, and generate student access codes for your classes.
-              </p>
-              <button className="btn-disabled" disabled>
-                <svg style={{ width: '16px', height: '16px', marginRight: '8px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Coming Soon
-              </button>
-            </div>
-
-            {/* Student Access */}
-            <div className="feature-card hover-card">
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-                <div style={{ 
-                  width: '48px', 
-                  height: '48px', 
-                  background: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)', 
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: '16px'
-                }}>
-                  <svg style={{ width: '24px', height: '24px', color: '#059669' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                  </svg>
-                </div>
-                <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>Student Access</h3>
-              </div>
-              <p style={{ color: '#6B7280', marginBottom: '24px', lineHeight: '1.6' }}>
-                View your class codes and manage student access to your AI assistant. Monitor who has joined your class.
-              </p>
-              <button className="btn-disabled" disabled>
-                <svg style={{ width: '16px', height: '16px', marginRight: '8px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Coming Soon
-              </button>
-            </div>
-
-            {/* Analytics */}
-            <div className="feature-card hover-card">
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-                <div style={{ 
-                  width: '48px', 
-                  height: '48px', 
-                  background: 'linear-gradient(135deg, #FED7AA 0%, #FDBA74 100%)', 
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: '16px'
-                }}>
-                  <svg style={{ width: '24px', height: '24px', color: '#EA580C' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>Analytics & Insights</h3>
-              </div>
-              <p style={{ color: '#6B7280', marginBottom: '24px', lineHeight: '1.6' }}>
-                Track student engagement, see frequently asked questions, and identify knowledge gaps to improve your teaching.
-              </p>
-              <button className="btn-disabled" disabled>
-                <svg style={{ width: '16px', height: '16px', marginRight: '8px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Coming Soon
-              </button>
-            </div>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create New Class
+            </button>
           </div>
 
-          {/* Status Banner */}
-          <div style={{ 
-            padding: '32px', 
-            background: '#EFF6FF', 
-            border: '1px solid #BFDBFE',
-            borderLeft: '4px solid #3B82F6',
-            borderRadius: '12px'
-          }}>
-            <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
-              <div style={{ flexShrink: 0 }}>
-                <div style={{ 
-                  width: '40px', 
-                  height: '40px', 
-                  background: '#DBEAFE', 
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <svg style={{ width: '24px', height: '24px', color: '#2563EB' }} fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
+          {/* Classes Grid */}
+          {classes.length === 0 ? (
+            <div className="feature-card" style={{ textAlign: 'center', padding: '64px 32px' }}>
+              <div style={{ 
+                width: '64px', 
+                height: '64px', 
+                background: '#F3F4F6', 
+                borderRadius: '50%', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                margin: '0 auto 24px'
+              }}>
+                <svg style={{ width: '32px', height: '32px', color: '#9CA3AF' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
               </div>
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1E40AF', marginBottom: '12px' }}>
-                  🚀 Dashboard Under Development
-                </h3>
-                <p style={{ color: '#1E40AF', marginBottom: '16px', lineHeight: '1.6' }}>
-                  The full teacher dashboard is currently being built with exciting features coming soon:
-                </p>
-                <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                  <li style={{ fontSize: '14px', color: '#1E40AF', marginBottom: '8px', display: 'flex', alignItems: 'flex-start' }}>
-                    <svg style={{ width: '16px', height: '16px', marginRight: '12px', marginTop: '2px', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Drag & drop material uploads with AI processing
-                  </li>
-                  <li style={{ fontSize: '14px', color: '#1E40AF', marginBottom: '8px', display: 'flex', alignItems: 'flex-start' }}>
-                    <svg style={{ width: '16px', height: '16px', marginRight: '12px', marginTop: '2px', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Advanced AI assistant configuration and personality settings
-                  </li>
-                  <li style={{ fontSize: '14px', color: '#1E40AF', marginBottom: '8px', display: 'flex', alignItems: 'flex-start' }}>
-                    <svg style={{ width: '16px', height: '16px', marginRight: '12px', marginTop: '2px', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Real-time student engagement analytics and insights
-                  </li>
-                  <li style={{ fontSize: '14px', color: '#1E40AF', display: 'flex', alignItems: 'flex-start' }}>
-                    <svg style={{ width: '16px', height: '16px', marginRight: '12px', marginTop: '2px', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Class management tools and student access controls
-                  </li>
-                </ul>
-              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>
+                No classes yet
+              </h3>
+              <p style={{ color: '#6B7280', marginBottom: '24px' }}>
+                Create your first class to get started with ClassAI
+              </p>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="btn-primary"
+              >
+                Create Your First Class
+              </button>
             </div>
-          </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
+              {classes.map((classItem) => (
+                <div key={classItem.code} className="feature-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                      <div style={{ 
+                        width: '48px', 
+                        height: '48px', 
+                        background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', 
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <svg style={{ width: '24px', height: '24px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                      </div>
+                      <span style={{ 
+                        padding: '4px 12px', 
+                        background: classItem.materials ? '#DEF7EC' : '#FEF3C7', 
+                        color: classItem.materials ? '#059669' : '#D97706',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: '600'
+                      }}>
+                        {classItem.materials ? 'Active' : 'Setup Needed'}
+                      </span>
+                    </div>
+                    
+                    <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>
+                      {classItem.name}
+                    </h3>
+                    {classItem.subject && (
+                      <p style={{ color: '#6B7280', fontSize: '14px', marginBottom: '16px' }}>
+                        {classItem.subject}
+                      </p>
+                    )}
+                    
+                    <div style={{ 
+                      padding: '12px', 
+                      background: '#F9FAFB', 
+                      borderRadius: '8px',
+                      marginBottom: '16px'
+                    }}>
+                      <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '6px' }}>
+                        Class Code
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ 
+                          fontSize: '18px', 
+                          fontWeight: '700', 
+                          color: '#111827',
+                          fontFamily: 'monospace'
+                        }}>
+                          {classItem.code}
+                        </span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(classItem.code)
+                          }}
+                          style={{
+                            padding: '4px 8px',
+                            background: 'white',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            color: '#6B7280'
+                          }}
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => openUploadModal(classItem)}
+                    className="btn-secondary"
+                    style={{ width: '100%' }}
+                  >
+                    {classItem.materials ? 'Update Materials' : 'Upload Materials'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </SignedIn>
       </div>
+
+      {/* Create Class Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Class</h2>
+            
+            <form onSubmit={handleCreateClass}>
+              <div style={{ marginBottom: '20px' }}>
+                <label htmlFor="className" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                  Class Name *
+                </label>
+                <input
+                  type="text"
+                  id="className"
+                  value={newClassName}
+                  onChange={(e) => setNewClassName(e.target.value)}
+                  placeholder="e.g., Biology 101"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
+                  }}
+                  required
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label htmlFor="classSubject" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                  Subject (Optional)
+                </label>
+                <input
+                  type="text"
+                  id="classSubject"
+                  value={newClassSubject}
+                  onChange={(e) => setNewClassSubject(e.target.value)}
+                  placeholder="e.g., Life Sciences"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false)
+                    setNewClassName('')
+                    setNewClassSubject('')
+                  }}
+                  className="btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newClassName.trim() || isCreating}
+                  className="btn-primary"
+                  style={{ 
+                    flex: 1,
+                    opacity: (!newClassName.trim() || isCreating) ? '0.5' : '1',
+                    cursor: (!newClassName.trim() || isCreating) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isCreating ? 'Creating...' : 'Create Class'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Materials Modal */}
+      {showUploadModal && selectedClass && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ overflowY: 'auto' }}>
+          <div className="bg-white rounded-lg p-8 max-w-2xl w-full" style={{ margin: '20px' }}>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Upload Class Materials
+            </h2>
+            <p style={{ color: '#6B7280', marginBottom: '24px' }}>
+              {selectedClass.name} - Code: <strong>{selectedClass.code}</strong>
+            </p>
+            
+            <form onSubmit={handleUploadMaterials}>
+              <div style={{ marginBottom: '16px' }}>
+                <label htmlFor="materials" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                  Course Materials and Information
+                </label>
+                <textarea
+                  id="materials"
+                  value={materials}
+                  onChange={(e) => setMaterials(e.target.value)}
+                  placeholder="Enter your syllabus, course description, key topics, lecture notes, or any information you want the AI to reference when helping students..."
+                  rows="12"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                  required
+                />
+                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>
+                  The AI will use this information to help students understand your course material
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUploadModal(false)
+                    setMaterials('')
+                    setSelectedClass(null)
+                  }}
+                  className="btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!materials.trim() || isUploading}
+                  className="btn-primary"
+                  style={{ 
+                    flex: 1,
+                    opacity: (!materials.trim() || isUploading) ? '0.5' : '1',
+                    cursor: (!materials.trim() || isUploading) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isUploading ? 'Saving...' : 'Save Materials'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

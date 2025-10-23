@@ -11,6 +11,7 @@ function ClassChat() {
   const [classData, setClassData] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
+  )))
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef(null)
 
@@ -126,7 +127,7 @@ function ClassChat() {
           </div>
           
           <SignedIn>
-            <UserButton afterSignOutUrl="/" />
+            <UserButton afterSignOutUrl="/AISCHOOL3/" />
           </SignedIn>
         </div>
       </nav>
@@ -291,6 +292,10 @@ function ClassChat() {
         @keyframes pulse {
           0%, 100% { opacity: 0.4; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

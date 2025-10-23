@@ -11,6 +11,17 @@ function Student() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Strip Clerk's __clerk_db_jwt param from the URL after redirect
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('__clerk_db_jwt')) {
+        url.searchParams.delete('__clerk_db_jwt')
+        window.history.replaceState({}, '', url.pathname + url.hash)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (user) {
       const studentClasses = getStudentClasses(user.id)
@@ -251,7 +262,7 @@ function Student() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                     </svg>
                   </div>
-                  
+
                   <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>
                     {classItem.name}
                   </h3>

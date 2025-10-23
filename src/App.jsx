@@ -1,6 +1,6 @@
 import React from 'react'
 import { Routes, Route, Link, useNavigate } from 'react-router-dom'
-import { SignedIn, UserButton } from '@clerk/clerk-react' //kept only avatar when signed in
+import { SignedIn, UserButton } from '@clerk/clerk-react'
 import Teacher from './pages/Teacher'
 import Student from './pages/Student'
 import ClassChat from './pages/ClassChat'
@@ -23,9 +23,9 @@ function HomePage() {
           </Link>
 
           <div>
-            {/*No SignedOut sign-in in the header*/}
+            {/* No SignedOut sign-in in the header */}
             <SignedIn>
-              <UserButton afterSignOutUrl="/" />
+              <UserButton afterSignOutUrl="/AISCHOOL3/" />
             </SignedIn>
           </div>
         </div>

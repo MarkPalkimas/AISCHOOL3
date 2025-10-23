@@ -1,54 +1,13 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Routes, Route, Link, useNavigate } from 'react-router-dom'
-import { SignedIn, UserButton } from '@clerk/clerk-react' //kept only what's needed in the header
+import { SignedIn, UserButton } from '@clerk/clerk-react' //kept only avatar when signed in
 import Teacher from './pages/Teacher'
 import Student from './pages/Student'
 import ClassChat from './pages/ClassChat'
 
-function RoleSelector({ onSelectRole, onClose }) {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-8 max-w-md w-full">
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to ClassAI</h2>
-          <p className="text-gray-600">Choose your role to continue</p>
-        </div>
-        
-        <div className="space-y-3">
-          <button
-            onClick={() => onSelectRole('teacher')}
-            className="w-full btn-primary"
-          >
-            I'm a Teacher
-          </button>
-          <button
-            onClick={() => onSelectRole('student')}
-            className="w-full btn-secondary"
-          >
-            I'm a Student
-          </button>
-        </div>
-        
-        <button
-          onClick={onClose}
-          className="mt-4 w-full text-gray-500 hover:text-gray-700 text-sm"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function HomePage() {
   const navigate = useNavigate()
-  const [showRoleSelector, setShowRoleSelector] = useState(false)
-  
-  const handleRoleSelection = (role) => {
-    setShowRoleSelector(false)
-    navigate(`/${role}`)
-  }
-  
+
   return (
     <div style={{ minHeight: '100vh', background: 'white' }}>
       {/* Navigation */}
@@ -58,17 +17,13 @@ function HomePage() {
             <img 
               src="/Logo.jpg" 
               alt="ClassAI Logo" 
-              style={{ 
-                width: '32px', 
-                height: '32px', 
-                objectFit: 'contain'
-              }} 
+              style={{ width: '32px', height: '32px', objectFit: 'contain' }} 
             />
             <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
           </Link>
-          
+
           <div>
-            {/* Removed SignedOut login so nothing shows when signed out */}
+            {/*No SignedOut sign-in in the header*/}
             <SignedIn>
               <UserButton afterSignOutUrl="/" />
             </SignedIn>
@@ -89,24 +44,11 @@ function HomePage() {
         </p>
 
         <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button 
-            onClick={() => navigate('/teacher')}
-            className="btn-primary"
-          >
+          <button onClick={() => navigate('/teacher')} className="btn-primary">
             For Teachers
           </button>
-          <button 
-            onClick={() => navigate('/student')}
-            className="btn-secondary"
-          >
+          <button onClick={() => navigate('/student')} className="btn-secondary">
             For Students
-          </button>
-          {/* If you still want role selection modal from the hero, keep this trigger */}
-          <button 
-            onClick={() => setShowRoleSelector(true)}
-            className="btn-tertiary"
-          >
-            Choose Role
           </button>
         </div>
       </div>
@@ -176,14 +118,6 @@ function HomePage() {
           </p>
         </div>
       </footer>
-
-      {/* Role Selector Modal */}
-      {showRoleSelector && (
-        <RoleSelector 
-          onSelectRole={handleRoleSelection}
-          onClose={() => setShowRoleSelector(false)}
-        />
-      )}
     </div>
   )
 }

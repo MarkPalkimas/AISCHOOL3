@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Routes, Route, Link, useNavigate } from 'react-router-dom'
-import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/clerk-react'
+import { SignedIn, UserButton } from '@clerk/clerk-react' //kept only what's needed in the header
 import Teacher from './pages/Teacher'
 import Student from './pages/Student'
 import ClassChat from './pages/ClassChat'
@@ -68,26 +68,7 @@ function HomePage() {
           </Link>
           
           <div>
-            <SignedOut>
-              <button 
-                onClick={() => setShowRoleSelector(true)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#6B7280',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  transition: 'color 0.2s'
-                }}
-                onMouseOver={(e) => e.target.style.color = '#111827'}
-                onMouseOut={(e) => e.target.style.color = '#6B7280'}
-              >
-                Log in
-              </button>
-            </SignedOut>
+            {/* Removed SignedOut login so nothing shows when signed out */}
             <SignedIn>
               <UserButton afterSignOutUrl="/" />
             </SignedIn>
@@ -119,6 +100,13 @@ function HomePage() {
             className="btn-secondary"
           >
             For Students
+          </button>
+          {/* If you still want role selection modal from the hero, keep this trigger */}
+          <button 
+            onClick={() => setShowRoleSelector(true)}
+            className="btn-tertiary"
+          >
+            Choose Role
           </button>
         </div>
       </div>

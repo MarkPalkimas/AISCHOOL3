@@ -15,6 +15,17 @@ function Teacher() {
   const [isCreating, setIsCreating] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
+  // Strip Clerk's __clerk_db_jwt param from the URL after redirect
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('__clerk_db_jwt')) {
+        url.searchParams.delete('__clerk_db_jwt')
+        window.history.replaceState({}, '', url.pathname + url.hash)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (user) {
       const teacherClasses = getTeacherClasses(user.id)

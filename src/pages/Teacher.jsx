@@ -183,7 +183,14 @@ function Teacher() {
 
               <div style={{ marginBottom: '24px' }}>
                 <label htmlFor="classSubject" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Subject (Optional)</label>
-                <input type="text" id="classSubject" value={newClassSubject} onChange={(e) => setNewClassSubject(e.target.value)} placeholder="e.g., Life Sciences" style={{ width: '100%', padding: '12px 16px', border: '1px solid '#D1D5DB', borderRadius: '6px', fontSize: '16px', boxSizing: 'border-box' }} />
+                <input
+                  type="text"
+                  id="classSubject"
+                  value={newClassSubject}
+                  onChange={(e) => setNewClassSubject(e.target.value)}
+                  placeholder="e.g., Life Sciences"
+                  style={{ width: '100%', padding: '12px 16px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '16px', boxSizing: 'border-box' }}
+                />
               </div>
 
               <div style={{ display: 'flex', gap: '12px' }}>

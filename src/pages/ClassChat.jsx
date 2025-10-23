@@ -11,7 +11,6 @@ function ClassChat() {
   const [classData, setClassData] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
-  )))
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef(null)
 
@@ -33,7 +32,7 @@ function ClassChat() {
     }
 
     setClassData(data)
-    
+
     // Add welcome message
     setMessages([{
       role: 'assistant',
@@ -51,7 +50,7 @@ function ClassChat() {
 
     const userMessage = input.trim()
     setInput('')
-    
+
     // Add user message
     const newMessages = [...messages, { role: 'user', content: userMessage }]
     setMessages(newMessages)
@@ -62,12 +61,12 @@ function ClassChat() {
       const response = await sendMessageToAI(userMessage, classData.materials, newMessages)
       setMessages([...newMessages, { role: 'assistant', content: response }])
     } catch (error) {
-      setMessages([...newMessages, { 
-        role: 'assistant', 
-        content: 'I apologize, but I encountered an error. Please try again.' 
+      setMessages([...newMessages, {
+        role: 'assistant',
+        content: 'I apologize, but I encountered an error. Please try again.'
       }])
     }
-    
+
     setIsLoading(false)
   }
 
@@ -75,9 +74,9 @@ function ClassChat() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
+          <div style={{
+            width: '48px',
+            height: '48px',
             border: '4px solid #E5E7EB',
             borderTopColor: '#3B82F6',
             borderRadius: '50%',
@@ -96,7 +95,7 @@ function ClassChat() {
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0', flexShrink: 0 }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <Link 
+            <Link
               to="/student"
               style={{
                 padding: '8px',
@@ -125,7 +124,7 @@ function ClassChat() {
               )}
             </div>
           </div>
-          
+
           <SignedIn>
             <UserButton afterSignOutUrl="/AISCHOOL3/" />
           </SignedIn>
@@ -133,15 +132,15 @@ function ClassChat() {
       </nav>
 
       {/* Messages Area */}
-      <div style={{ 
-        flex: 1, 
-        overflowY: 'auto', 
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
         padding: '24px',
         background: '#F9FAFB'
       }}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
           {messages.map((message, index) => (
-            <div 
+            <div
               key={index}
               style={{
                 display: 'flex',
@@ -163,7 +162,7 @@ function ClassChat() {
               </div>
             </div>
           ))}
-          
+
           {isLoading && (
             <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '16px' }}>
               <div style={{
@@ -175,23 +174,23 @@ function ClassChat() {
                 gap: '8px',
                 alignItems: 'center'
               }}>
-                <div style={{ 
-                  width: '8px', 
-                  height: '8px', 
+                <div style={{
+                  width: '8px',
+                  height: '8px',
                   background: '#9CA3AF',
                   borderRadius: '50%',
                   animation: 'pulse 1.4s ease-in-out 0s infinite'
                 }}></div>
-                <div style={{ 
-                  width: '8px', 
-                  height: '8px', 
+                <div style={{
+                  width: '8px',
+                  height: '8px',
                   background: '#9CA3AF',
                   borderRadius: '50%',
                   animation: 'pulse 1.4s ease-in-out 0.2s infinite'
                 }}></div>
-                <div style={{ 
-                  width: '8px', 
-                  height: '8px', 
+                <div style={{
+                  width: '8px',
+                  height: '8px',
                   background: '#9CA3AF',
                   borderRadius: '50%',
                   animation: 'pulse 1.4s ease-in-out 0.4s infinite'
@@ -204,15 +203,15 @@ function ClassChat() {
       </div>
 
       {/* Input Area */}
-      <div style={{ 
-        borderTop: '1px solid #E5E7EB', 
+      <div style={{
+        borderTop: '1px solid #E5E7EB',
         padding: '16px 24px',
         background: 'white',
         flexShrink: 0
       }}>
         <form onSubmit={handleSubmit} style={{ maxWidth: '900px', margin: '0 auto' }}>
-          <div style={{ 
-            display: 'flex', 
+          <div style={{
+            display: 'flex',
             gap: '12px',
             padding: '12px',
             border: '2px solid #E5E7EB',
@@ -220,8 +219,8 @@ function ClassChat() {
             background: 'white',
             transition: 'border-color 0.2s'
           }}
-          onFocus={(e) => e.currentTarget.style.borderColor = '#3B82F6'}
-          onBlur={(e) => e.currentTarget.style.borderColor = '#E5E7EB'}
+            onFocus={(e) => e.currentTarget.style.borderColor = '#3B82F6'}
+            onBlur={(e) => e.currentTarget.style.borderColor = '#E5E7EB'}
           >
             <input
               type="text"
@@ -257,9 +256,9 @@ function ClassChat() {
             >
               {isLoading ? (
                 <>
-                  <div style={{ 
-                    width: '16px', 
-                    height: '16px', 
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
                     border: '2px solid #9CA3AF',
                     borderTopColor: 'transparent',
                     borderRadius: '50%',
@@ -277,9 +276,9 @@ function ClassChat() {
               )}
             </button>
           </div>
-          <p style={{ 
-            fontSize: '12px', 
-            color: '#6B7280', 
+          <p style={{
+            fontSize: '12px',
+            color: '#6B7280',
             marginTop: '12px',
             textAlign: 'center'
           }}>

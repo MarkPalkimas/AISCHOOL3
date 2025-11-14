@@ -13,7 +13,13 @@ if (!clerkPubKey) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={clerkPubKey}>
+    <ClerkProvider 
+      publishableKey={clerkPubKey}
+      afterSignInUrl="/AISCHOOL3/"
+      afterSignUpUrl="/AISCHOOL3/"
+      signInUrl="/AISCHOOL3/"
+      signUpUrl="/AISCHOOL3/"
+    >
       <BrowserRouter basename={import.meta.env.DEV ? '/' : '/AISCHOOL3'}>
         <App />
       </BrowserRouter>

@@ -23,19 +23,14 @@ function Admin() {
       return
     }
 
-    // Load users from localStorage (in a real app, this would be a backend API)
     loadUsers()
   }, [user, navigate])
 
   const loadUsers = () => {
     setIsLoading(true)
     
-    // Get all user data from localStorage
-    // In production, this would be a secure backend API call
     const mockUsers = []
     
-    // For demo purposes, we'll just show the current user
-    // In production, you'd fetch all users from your backend
     if (user) {
       mockUsers.push({
         id: user.id,
@@ -61,7 +56,6 @@ function Admin() {
         })
         loadUsers()
       } else {
-        // In production, this would be a backend API call to update another user's role
         setError('Can only update your own role in this demo. In production, this would update any user.')
       }
     } catch (err) {
@@ -97,7 +91,6 @@ function Admin() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'white' }}>
-      {/* Navigation */}
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
@@ -112,9 +105,7 @@ function Admin() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <div style={{ padding: '40px 24px', maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Header */}
         <div style={{ marginBottom: '32px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
             <div style={{
@@ -151,7 +142,6 @@ function Admin() {
           </div>
         )}
 
-        {/* Info Box */}
         <div style={{
           padding: '16px',
           background: '#EEF2FF',
@@ -174,7 +164,6 @@ function Admin() {
           </div>
         </div>
 
-        {/* Search */}
         <div style={{ marginBottom: '24px' }}>
           <input
             type="text"
@@ -193,12 +182,20 @@ function Admin() {
           />
         </div>
 
-        {/* Users Table */}
         <div className="feature-card" style={{ padding: '0', overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
+                  <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    User
+                  </th>
+                  <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Email
+                  </th>
+                  <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Current Role
+                  </th>
                   <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Actions
                   </th>
@@ -291,13 +288,4 @@ function Admin() {
   )
 }
 
-export default AdminAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    User
-                  </th>
-                  <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Email
-                  </th>
-                  <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Current Role
-                  </th>
-                  <th style={{ padding: '12px 24px', text
+export default Admin

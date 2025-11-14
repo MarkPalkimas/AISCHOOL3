@@ -11,11 +11,41 @@ import { getUserRole, canAccessTeacherArea, canAccessStudentArea, canAccessAdmin
 
 function HomePage() {
   const navigate = useNavigate()
-  const { user } = useUser()
+  const { user, isLoaded } = useUser()
+
+  const handleTeacherClick = () => {
+    if (user) {
+      const role = getUserRole(user)
+      if (!role) {
+        // Will show role selector
+        navigate('/teacher')
+      } else if (canAccessTeacherArea(user)) {
+        navigate('/teacher')
+      } else {
+        navigate('/access-denied')
+      }
+    } else {
+      navigate('/teacher')
+    }
+  }
+
+  const handleStudentClick = () => {
+    if (user) {
+      const role = getUserRole(user)
+      if (!role) {
+        navigate('/student')
+      } else if (canAccessStudentArea(user)) {
+        navigate('/student')
+      } else {
+        navigate('/access-denied')
+      }
+    } else {
+      navigate('/student')
+    }
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'white' }}>
-      {/* Navigation */}
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
@@ -28,11 +58,6 @@ function HomePage() {
           </Link>
 
           <div>
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button className="btn-primary">Sign In</button>
-              </SignInButton>
-            </SignedOut>
             <SignedIn>
               <UserMenu />
             </SignedIn>
@@ -40,7 +65,6 @@ function HomePage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
       <div style={{ padding: '80px 24px', textAlign: 'center', maxWidth: '1200px', margin: '0 auto' }}>
         <h1 className="hero-title" style={{ marginBottom: '24px' }}>
           AI-Powered Learning<br />
@@ -53,16 +77,15 @@ function HomePage() {
         </p>
 
         <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/teacher')} className="btn-primary">
+          <button onClick={handleTeacherClick} className="btn-primary">
             For Teachers
           </button>
-          <button onClick={() => navigate('/student')} className="btn-secondary">
+          <button onClick={handleStudentClick} className="btn-secondary">
             For Students
           </button>
         </div>
       </div>
 
-      {/* Features Section */}
       <div style={{ padding: '80px 24px', background: '#F9FAFB' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px' }}>
@@ -111,7 +134,6 @@ function HomePage() {
         </div>
       </div>
 
-      {/* Footer */}
       <footer style={{ borderTop: '1px solid #E5E7EB', padding: '40px 24px', textAlign: 'center' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
@@ -131,27 +153,22 @@ function HomePage() {
   )
 }
 
-// Protected route wrapper for role-based access
 function ProtectedRoute({ children, requireRole }) {
   const { user, isLoaded } = useUser()
   const navigate = useNavigate()
 
   React.useEffect(() => {
     if (isLoaded && !user) {
-      navigate('/')
       return
     }
 
     if (isLoaded && user) {
       const role = getUserRole(user)
       
-      // If user has no role, redirect to role selector
       if (!role) {
-        // Show role selector instead of redirecting
         return
       }
 
-      // Check access based on required role
       if (requireRole === 'teacher' && !canAccessTeacherArea(user)) {
         navigate('/access-denied')
         return
@@ -189,10 +206,9 @@ function ProtectedRoute({ children, requireRole }) {
   }
 
   if (!user) {
-    return null
+    return children
   }
 
-  // Check if user needs to select a role
   const role = getUserRole(user)
   if (!role) {
     return <RoleSelector />

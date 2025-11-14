@@ -1,9 +1,12 @@
 import React, { useState } from 'react'
 import { useUser } from '@clerk/clerk-react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ROLES } from '../utils/roles'
 
 function RoleSelector() {
   const { user } = useUser()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -12,6 +15,25 @@ function RoleSelector() {
     setIsSubmitting(true)
     try {
       await user.update({ publicMetadata: { role: role } })
+      
+      // Redirect based on which page they were trying to access
+      if (location.pathname.includes('/teacher')) {
+        if (role === ROLES.TEACHER || role === ROLES.ADMIN) {
+          navigate('/teacher')
+        } else {
+          navigate('/access-denied')
+        }
+      } else if (location.pathname.includes('/student')) {
+        navigate('/student')
+      } else {
+        // Default redirect based on role
+        if (role === ROLES.TEACHER || role === ROLES.ADMIN) {
+          navigate('/teacher')
+        } else {
+          navigate('/student')
+        }
+      }
+      
       window.location.reload()
     } catch (err) {
       setError('Failed to set role. Please try again.')

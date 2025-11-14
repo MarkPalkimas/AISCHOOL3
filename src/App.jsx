@@ -1,12 +1,17 @@
 import React from 'react'
 import { Routes, Route, Link, useNavigate } from 'react-router-dom'
-import { SignedIn, UserButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignInButton, useUser } from '@clerk/clerk-react'
 import Teacher from './pages/Teacher'
 import Student from './pages/Student'
 import ClassChat from './pages/ClassChat'
+import Admin from './pages/Admin'
+import RoleSelector from './components/RoleSelector'
+import UserMenu from './components/UserMenu'
+import { getUserRole, canAccessTeacherArea, canAccessStudentArea, canAccessAdminArea } from './utils/roles'
 
 function HomePage() {
   const navigate = useNavigate()
+  const { user } = useUser()
 
   return (
     <div style={{ minHeight: '100vh', background: 'white' }}>
@@ -23,9 +28,13 @@ function HomePage() {
           </Link>
 
           <div>
-            {/* No SignedOut sign-in in the header */}
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className="btn-primary">Sign In</button>
+              </SignInButton>
+            </SignedOut>
             <SignedIn>
-              <UserButton afterSignOutUrl="/AISCHOOL3/" />
+              <UserMenu />
             </SignedIn>
           </div>
         </div>
@@ -122,13 +131,165 @@ function HomePage() {
   )
 }
 
+// Protected route wrapper for role-based access
+function ProtectedRoute({ children, requireRole }) {
+  const { user, isLoaded } = useUser()
+  const navigate = useNavigate()
+
+  React.useEffect(() => {
+    if (isLoaded && !user) {
+      navigate('/')
+      return
+    }
+
+    if (isLoaded && user) {
+      const role = getUserRole(user)
+      
+      // If user has no role, redirect to role selector
+      if (!role) {
+        // Show role selector instead of redirecting
+        return
+      }
+
+      // Check access based on required role
+      if (requireRole === 'teacher' && !canAccessTeacherArea(user)) {
+        navigate('/access-denied')
+        return
+      }
+
+      if (requireRole === 'student' && !canAccessStudentArea(user)) {
+        navigate('/access-denied')
+        return
+      }
+
+      if (requireRole === 'admin' && !canAccessAdminArea(user)) {
+        navigate('/access-denied')
+        return
+      }
+    }
+  }, [isLoaded, user, requireRole, navigate])
+
+  if (!isLoaded) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #E5E7EB',
+            borderTopColor: '#3B82F6',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 16px'
+          }}></div>
+          <p style={{ color: '#6B7280' }}>Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
+
+  // Check if user needs to select a role
+  const role = getUserRole(user)
+  if (!role) {
+    return <RoleSelector />
+  }
+
+  return children
+}
+
+function AccessDenied() {
+  const navigate = useNavigate()
+  const { user } = useUser()
+  const role = getUserRole(user)
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'white' }}>
+      <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
+            <img 
+              src="/Logo.jpg" 
+              alt="ClassAI Logo" 
+              style={{ width: '32px', height: '32px', objectFit: 'contain' }} 
+            />
+            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
+          </Link>
+          <SignedIn>
+            <UserMenu />
+          </SignedIn>
+        </div>
+      </nav>
+
+      <div style={{ padding: '80px 24px', textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{
+          width: '80px',
+          height: '80px',
+          background: '#FEE2E2',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 24px'
+        }}>
+          <svg style={{ width: '40px', height: '40px', color: '#EF4444' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+
+        <h1 style={{ fontSize: '32px', fontWeight: '700', color: '#111827', marginBottom: '16px' }}>
+          Access Denied
+        </h1>
+        
+        <p style={{ fontSize: '18px', color: '#6B7280', marginBottom: '32px', lineHeight: '1.6' }}>
+          {role === 'student' 
+            ? "This area is only accessible to teachers. Students can access the student portal to join classes and chat with AI tutors."
+            : "You don't have permission to access this area."}
+        </p>
+
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => navigate('/')} className="btn-primary">
+            Go Home
+          </button>
+          {role === 'student' && (
+            <button onClick={() => navigate('/student')} className="btn-secondary">
+              Go to Student Portal
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/teacher" element={<Teacher />} />
-      <Route path="/student" element={<Student />} />
-      <Route path="/class/:classCode" element={<ClassChat />} />
+      <Route path="/teacher" element={
+        <ProtectedRoute requireRole="teacher">
+          <Teacher />
+        </ProtectedRoute>
+      } />
+      <Route path="/student" element={
+        <ProtectedRoute requireRole="student">
+          <Student />
+        </ProtectedRoute>
+      } />
+      <Route path="/class/:classCode" element={
+        <ProtectedRoute requireRole="student">
+          <ClassChat />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin" element={
+        <ProtectedRoute requireRole="admin">
+          <Admin />
+        </ProtectedRoute>
+      } />
+      <Route path="/access-denied" element={<AccessDenied />} />
     </Routes>
   )
 }

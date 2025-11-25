@@ -36,7 +36,7 @@ function saveAllEnrollments(enrollments) {
 export function createClass(teacherId, className, subject = '') {
   const classes = getAllClasses()
   const code = generateClassCode()
-  
+
   const newClass = {
     code,
     name: className,
@@ -45,10 +45,10 @@ export function createClass(teacherId, className, subject = '') {
     materials: '',
     createdAt: new Date().toISOString()
   }
-  
+
   classes[code] = newClass
   saveAllClasses(classes)
-  
+
   return newClass
 }
 
@@ -80,26 +80,26 @@ export function updateClassMaterials(classCode, materials) {
 export function joinClass(studentId, classCode) {
   const classes = getAllClasses()
   const enrollments = getAllEnrollments()
-  
+
   // Check if class exists and has materials
-  if (!classes[classCode] || !classes[classCode].materials) {
+  if (!classes[classCode]) {
     return false
   }
-  
+
   // Initialize student's enrollments if needed
   if (!enrollments[studentId]) {
     enrollments[studentId] = []
   }
-  
-  // Check if already enrolled
+
+  // Check if already enrolled - if so, just return true (success)
   if (enrollments[studentId].includes(classCode)) {
-    return false
+    return true
   }
-  
+
   // Add enrollment
   enrollments[studentId].push(classCode)
   saveAllEnrollments(enrollments)
-  
+
   return true
 }
 
@@ -107,9 +107,9 @@ export function joinClass(studentId, classCode) {
 export function getStudentClasses(studentId) {
   const enrollments = getAllEnrollments()
   const classes = getAllClasses()
-  
+
   const studentEnrollments = enrollments[studentId] || []
-  
+
   return studentEnrollments
     .map(code => classes[code])
     .filter(c => c !== undefined)

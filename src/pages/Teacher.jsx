@@ -30,6 +30,15 @@ export default function Teacher() {
   const [editSubject, setEditSubject] = useState('')
   const [busy, setBusy] = useState(false)
 
+  // Auto-assign role if missing
+  useEffect(() => {
+    if (isLoaded && user && !user.publicMetadata.role) {
+      user.update({ publicMetadata: { role: 'teacher' } })
+        .then(() => window.location.reload())
+        .catch(err => console.error('Failed to set role', err))
+    }
+  }, [isLoaded, user])
+
   useEffect(() => {
     if (!isLoaded || !user) return
     setClasses(getTeacherClasses(user.id))
@@ -332,4 +341,3 @@ export default function Teacher() {
     </div>
   )
 }
-

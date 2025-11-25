@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SignedIn, SignedOut, useUser, useClerk } from '@clerk/clerk-react'
 import { getStudentClasses, joinClass, getClassByCode } from '../utils/storage'
+import UserMenu from '../components/UserMenu'
 
 const BASE = import.meta.env.BASE_URL
 const abs = (path = '') => {
@@ -13,12 +14,21 @@ const abs = (path = '') => {
 
 export default function Student() {
   const { user, isLoaded, isSignedIn } = useUser()
-  const { redirectToSignIn, signOut } = useClerk()
+  const { redirectToSignIn } = useClerk()
   const navigate = useNavigate()
   const [classes, setClasses] = useState([])
   const [teacherCode, setTeacherCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Auto-assign role if missing
+  useEffect(() => {
+    if (isLoaded && user && !user.publicMetadata.role) {
+      user.update({ publicMetadata: { role: 'student' } })
+        .then(() => window.location.reload())
+        .catch(err => console.error('Failed to set role', err))
+    }
+  }, [isLoaded, user])
 
   useEffect(() => {
     if (!isLoaded || !user) return
@@ -75,19 +85,10 @@ export default function Student() {
         >
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
             <img src={`${BASE}Logo.jpg`} alt="StudyGuideAI Logo" style={{ width: 32, height: 32 }} />
-            <span style={{ fontSize: 18, fontWeight: 700 }}>StudyGuideAI</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>StudyGuideAI</span>
           </Link>
           <SignedIn>
-            <button
-              type="button"
-              onClick={() => signOut({ redirectUrl: abs('') })}
-              style={{
-                borderRadius: '999px', padding: 0, border: '1px solid #E5E7EB',
-                background: 'transparent', cursor: 'pointer', width: 36, height: 36, overflow: 'hidden',
-              }}
-            >
-              <img src={user?.imageUrl} alt="pfp" style={{ width: '100%', height: '100%' }} />
-            </button>
+            <UserMenu />
           </SignedIn>
         </div>
       </nav>

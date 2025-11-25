@@ -19,17 +19,8 @@ const abs = (path = '') => {
 
 function HomePage() {
   const navigate = useNavigate()
-  const { isSignedIn, user, isLoaded } = useUser()
+  const { isSignedIn, user } = useUser()
   const { redirectToSignIn } = useClerk()
-
-  useEffect(() => {
-    if (isLoaded && isSignedIn && user) {
-      const role = user.publicMetadata?.role
-      if (!role) {
-        navigate('/role-selection')
-      }
-    }
-  }, [isLoaded, isSignedIn, user, navigate])
 
   const goTeacher = () => {
     if (isSignedIn) {
@@ -73,14 +64,6 @@ function HomePage() {
             <SignedIn>
               <UserMenu />
             </SignedIn>
-            <SignedOut>
-               <button 
-                className="btn-primary"
-                onClick={() => redirectToSignIn({ redirectUrl: abs(''), signUpUrl: abs('') })}
-              >
-                Sign In
-              </button>
-            </SignedOut>
           </div>
         </div>
       </nav>
@@ -177,4 +160,5 @@ export default function App() {
     </Routes>
   )
 }
+
 

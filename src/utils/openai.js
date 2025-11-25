@@ -38,8 +38,8 @@ export async function sendMessageToAI(userMessage, courseMaterials, conversation
       'complete this assignment',
       'what should i write'
     ]
-    
-    const isAskingForDirectAnswer = directAnswerKeywords.some(keyword => 
+
+    const isAskingForDirectAnswer = directAnswerKeywords.some(keyword =>
       userMessage.toLowerCase().includes(keyword)
     )
 
@@ -91,18 +91,18 @@ export async function sendMessageToAI(userMessage, courseMaterials, conversation
     if (!response.ok) {
       const errorData = await response.json()
       console.error('OpenAI API Error:', errorData)
-      
+
       if (response.status === 401) {
         throw new Error('Invalid OpenAI API key. Please check your configuration.')
       } else if (response.status === 429) {
-        throw new Error('Rate limit exceeded. Please try again in a moment.')
+        throw new Error('Rate limit exceeded. Check your OpenAI billing/credits.')
       } else {
         throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
       }
     }
 
     const data = await response.json()
-    
+
     if (!data.choices || data.choices.length === 0) {
       throw new Error('No response from AI')
     }
@@ -111,11 +111,11 @@ export async function sendMessageToAI(userMessage, courseMaterials, conversation
 
   } catch (error) {
     console.error('Error calling OpenAI API:', error)
-    
+
     if (error.message.includes('API key')) {
       throw new Error('OpenAI API configuration error. Please contact your teacher.')
     }
-    
+
     throw error
   }
 }

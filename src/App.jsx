@@ -47,15 +47,10 @@ function HomePage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'white', display: 'flex', flexDirection: 'column' }}>
-      {/* Top nav — brand + profile avatar */}
+      {/* Top nav — brand text + profile avatar (no logo image) */}
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link to="/" className="nav-brand">
-            <img
-              src={`${BASE}Logo.jpg`}
-              alt="StudyGuideAI Logo"
-              style={{ width: 32, height: 32, objectFit: 'contain' }}
-            />
+          <Link to="/" className="nav-brand" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 20, fontWeight: 800, color: '#111827', letterSpacing: -0.2 }}>
               StudyGuideAI
             </span>
@@ -71,6 +66,19 @@ function HomePage() {
       {/* Hero (OpenAI-inspired minimalist) */}
       <section style={{ padding: '96px 0 64px' }}>
         <div className="container" style={{ textAlign: 'center' }}>
+          {/* Centered logo above the heading */}
+          <img
+            src={`${BASE}Logo.jpg`}
+            alt="StudyGuideAI Logo"
+            style={{
+              width: 80,
+              height: 80,
+              objectFit: 'contain',
+              marginBottom: 20,
+              display: 'inline-block',
+            }}
+          />
+
           <h1
             className="hero-title"
             style={{
@@ -160,5 +168,3 @@ export default function App() {
     </Routes>
   )
 }
-
-

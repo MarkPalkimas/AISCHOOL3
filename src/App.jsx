@@ -70,6 +70,20 @@ function HomePage() {
       {/* Hero Section */}
       <section style={{ padding: '96px 0 64px' }}>
         <div className="container" style={{ textAlign: 'center' }}>
+          {/* Centered logo integrated into hero */}
+          <img
+            src={`${BASE}Logo.jpg`}
+            alt="StudyGuideAI Logo"
+            style={{
+              width: 120,
+              height: 120,
+              objectFit: 'contain',
+              marginBottom: 24,
+              display: 'inline-block',
+              borderRadius: '20px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+            }}
+          />
 
           <h1
             className="hero-title"

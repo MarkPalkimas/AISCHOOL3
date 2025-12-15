@@ -8,6 +8,7 @@ import UserMenu from '../components/UserMenu'
 
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
+import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 
@@ -60,7 +61,7 @@ function MessageBubble({ role, content }) {
         </div>
         <div className="bubble prose">
           <ReactMarkdown
-            remarkPlugins={[remarkMath]}
+            remarkPlugins={[remarkMath, remarkGfm]}
             rehypePlugins={[rehypeKatex]}
             components={{
               code({ node, inline, className, children, ...props }) {
@@ -210,6 +211,43 @@ export default function ClassChat() {
             <div ref={messagesEndRef} />
           </div>
         </div>
+
+        {/* Live Preview - shows formatted markdown/math as you type */}
+        {input.trim() && (
+          <div style={{
+            marginTop: 16,
+            padding: '12px 16px',
+            background: '#F9FAFB',
+            border: '1px solid #E5E7EB',
+            borderRadius: 12,
+            fontSize: 14
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Preview
+            </div>
+            <div className="prose" style={{ maxHeight: 200, overflowY: 'auto' }}>
+              <ReactMarkdown
+                remarkPlugins={[remarkMath, remarkGfm]}
+                rehypePlugins={[rehypeKatex]}
+                components={{
+                  code({ node, inline, className, children, ...props }) {
+                    return !inline ? (
+                      <pre className={className} style={{ background: '#1f2937', color: '#e5e7eb', padding: '8px', borderRadius: '6px', overflowX: 'auto', fontSize: 13 }}>
+                        <code {...props} style={{ fontFamily: 'monospace' }}>{children}</code>
+                      </pre>
+                    ) : (
+                      <code className={className} {...props} style={{ background: 'rgba(0,0,0,0.08)', padding: '2px 4px', borderRadius: '3px', fontFamily: 'monospace', fontSize: '0.9em' }}>
+                        {children}
+                      </code>
+                    )
+                  }
+                }}
+              >
+                {preprocessMath(input)}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={onSubmit} className="chat-input" style={{ marginTop: 16, display: 'flex', gap: 10 }}>
           <textarea

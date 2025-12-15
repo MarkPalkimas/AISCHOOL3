@@ -18,7 +18,27 @@ const abs = (path = '') => {
   return `${window.location.origin}${base}${rel}`
 }
 
+// Convert LaTeX parentheses notation to dollar signs for proper rendering
+function preprocessMath(content) {
+  if (!content) return content
+
+  // Convert \( ... \) to $ ... $
+  let processed = content.replace(/\\\((.*?)\\\)/g, '$$$1$$')
+
+  // Convert \[ ... \] to $$ ... $$
+  processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$$1$$$$')
+
+  // Also handle cases where AI uses ( ) without backslashes for inline math
+  // This is a bit more aggressive but helps catch common AI formatting
+  processed = processed.replace(/\( ([^)]*?[a-zA-Z_^{}\\]+[^)]*?) \)/g, '$$$1$$')
+
+  return processed
+}
+
 function MessageBubble({ role, content }) {
+  // Preprocess content to fix LaTeX formatting
+  const processedContent = preprocessMath(content)
+
   return (
     <div className={`msg ${role === 'user' ? 'user' : 'ai'}`}>
       <div
@@ -56,7 +76,7 @@ function MessageBubble({ role, content }) {
               }
             }}
           >
-            {content}
+            {processedContent}
           </ReactMarkdown>
         </div>
         <div className="tools" style={{ marginTop: 6, opacity: 0.6 }}>

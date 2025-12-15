@@ -66,11 +66,11 @@ function MessageBubble({ role, content }) {
             components={{
               code({ node, inline, className, children, ...props }) {
                 return !inline ? (
-                  <pre className={className} style={{ background: '#1f2937', color: '#e5e7eb', padding: '12px', borderRadius: '8px', overflowX: 'auto' }}>
-                    <code {...props} style={{ fontFamily: 'monospace' }}>{children}</code>
+                  <pre className={className} style={{ background: '#1E1E1E', color: '#D4D4D4', padding: '12px', borderRadius: '8px', overflowX: 'auto', border: '1px solid #333' }}>
+                    <code {...props} style={{ fontFamily: 'Consolas, Monaco, "Courier New", monospace', fontSize: '13px' }}>{children}</code>
                   </pre>
                 ) : (
-                  <code className={className} {...props} style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.9em' }}>
+                  <code className={className} {...props} style={{ background: '#F5F5F5', color: '#E01E5A', padding: '2px 5px', borderRadius: '3px', fontFamily: 'Consolas, Monaco, "Courier New", monospace', fontSize: '0.9em', border: '1px solid #E0E0E0' }}>
                     {children}
                   </code>
                 )
@@ -163,7 +163,7 @@ export default function ClassChat() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'white', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', background: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <nav style={{ borderBottom: '1px solid #E5E7EB', padding: '12px 0' }}>
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" className="nav-brand">
@@ -181,8 +181,8 @@ export default function ClassChat() {
         <div style={{ color: '#6B7280', fontSize: 13 }}>Class code: <code style={{ background: '#F3F4F6', padding: '2px 6px', borderRadius: 4 }}>{classData.code}</code></div>
       </div>
 
-      <div className="container" style={{ flex: 1, padding: '8px 0 18px', display: 'flex', flexDirection: 'column' }}>
-        <div className="feature-card" style={{ flex: 1, padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '65vh' }}>
+      <div className="container" style={{ flex: 1, padding: '8px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="feature-card" style={{ flex: 1, padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div className="chat-wrap" style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {messages.length === 0 && (
               <div style={{ textAlign: 'center', color: '#9CA3AF', marginTop: 'auto', marginBottom: 'auto' }}>
@@ -232,11 +232,11 @@ export default function ClassChat() {
                 components={{
                   code({ node, inline, className, children, ...props }) {
                     return !inline ? (
-                      <pre className={className} style={{ background: '#1f2937', color: '#e5e7eb', padding: '8px', borderRadius: '6px', overflowX: 'auto', fontSize: 13 }}>
-                        <code {...props} style={{ fontFamily: 'monospace' }}>{children}</code>
+                      <pre className={className} style={{ background: '#1E1E1E', color: '#D4D4D4', padding: '8px', borderRadius: '6px', overflowX: 'auto', fontSize: 13, border: '1px solid #333' }}>
+                        <code {...props} style={{ fontFamily: 'Consolas, Monaco, "Courier New", monospace' }}>{children}</code>
                       </pre>
                     ) : (
-                      <code className={className} {...props} style={{ background: 'rgba(0,0,0,0.08)', padding: '2px 4px', borderRadius: '3px', fontFamily: 'monospace', fontSize: '0.9em' }}>
+                      <code className={className} {...props} style={{ background: '#F5F5F5', color: '#E01E5A', padding: '2px 5px', borderRadius: '3px', fontFamily: 'Consolas, Monaco, "Courier New", monospace', fontSize: '0.9em', border: '1px solid #E0E0E0' }}>
                         {children}
                       </code>
                     )
@@ -249,41 +249,42 @@ export default function ClassChat() {
           </div>
         )}
 
-        <form onSubmit={onSubmit} className="chat-input" style={{ marginTop: 16, display: 'flex', gap: 10 }}>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                onSubmit(e)
-              }
-            }}
-            placeholder="Ask anything… (Shift+Enter for new line)"
-            rows={1}
-            style={{
-              flex: 1, padding: '14px 16px', borderRadius: 12,
-              border: '1px solid #D1D5DB', minHeight: 50, maxHeight: 120,
-              resize: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-              fontSize: 15
-            }}
-            disabled={isLoading}
-          />
-          <button
-            className="btn-primary"
-            disabled={isLoading || !input.trim()}
-            style={{ padding: '0 24px', borderRadius: 12, height: 50, display: 'flex', alignItems: 'center', gap: 8 }}
-          >
-            {isLoading ? 'Sending…' : (
-              <>
-                <span>Send</span>
-                <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-              </>
-            )}
-          </button>
-        </form>
-
-        {error && <p style={{ color: '#EF4444', marginTop: 8, fontSize: 14 }}>{error}</p>}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #E5E7EB', background: 'white' }}>
+          <form onSubmit={onSubmit} className="chat-input" style={{ display: 'flex', gap: 10 }}>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  onSubmit(e)
+                }
+              }}
+              placeholder="Ask anything… (Shift+Enter for new line)"
+              rows={1}
+              style={{
+                flex: 1, padding: '14px 16px', borderRadius: 12,
+                border: '1px solid #D1D5DB', minHeight: 50, maxHeight: 120,
+                resize: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                fontSize: 15
+              }}
+              disabled={isLoading}
+            />
+            <button
+              className="btn-primary"
+              disabled={isLoading || !input.trim()}
+              style={{ padding: '0 24px', borderRadius: 12, height: 50, display: 'flex', alignItems: 'center', gap: 8 }}
+            >
+              {isLoading ? 'Sending…' : (
+                <>
+                  <span>Send</span>
+                  <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                </>
+              )}
+            </button>
+          </form>
+          {error && <p style={{ color: '#EF4444', marginTop: 8, fontSize: 14 }}>{error}</p>}
+        </div>
       </div>
     </div>
   )

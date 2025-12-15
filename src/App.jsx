@@ -75,13 +75,16 @@ function HomePage() {
             src={`${BASE}Logo.jpg`}
             alt="StudyGuideAI Logo"
             style={{
-              width: 120,
-              height: 120,
+              width: 180,
+              height: 180,
               objectFit: 'contain',
-              marginBottom: 24,
+              marginBottom: 32,
               display: 'inline-block',
-              borderRadius: '20px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+              borderRadius: '24px',
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)',
+              background: 'white',
+              padding: '8px',
             }}
           />
 

@@ -53,6 +53,7 @@ function HomePage() {
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
         >
           <Link to="/" className="nav-brand" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img src={`${BASE}Logo.jpg`} alt="StudyGuideAI Logo" style={{ width: 32, height: 32 }} />
             <span style={{ fontSize: 20, fontWeight: 800, color: '#111827', letterSpacing: -0.2 }}>
               StudyGuideAI
             </span>
@@ -69,20 +70,6 @@ function HomePage() {
       {/* Hero Section */}
       <section style={{ padding: '96px 0 64px' }}>
         <div className="container" style={{ textAlign: 'center' }}>
-          {/* Centered, bigger, slightly lower logo */}
-          <img
-            src={`${BASE}Logo.jpg`}
-            alt="StudyGuideAI Logo"
-            style={{
-              width: 210,
-              height: 210,
-              objectFit: 'contain',
-              marginBottom: 28,
-              marginTop: -20,
-              display: 'inline-block',
-              filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.08))',
-            }}
-          />
 
           <h1
             className="hero-title"

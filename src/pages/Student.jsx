@@ -83,8 +83,9 @@ export default function Student() {
             alignItems: 'center',
           }}
         >
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-            <img src={`${BASE}Logo.jpg`} alt="StudyGuideAI Logo" style={{ width: 48, height: 48 }} />
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
+            <img src={`${BASE}Logo.jpg`} alt="StudyGuideAI Logo" style={{ width: 40, height: 40 }} />
+            <span style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>StudyGuideAI</span>
           </Link>
           <SignedIn>
             <UserMenu />

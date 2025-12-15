@@ -146,8 +146,7 @@ export default function ClassChat() {
       <nav style={{ borderBottom: '1px solid #E5E7EB', padding: '12px 0' }}>
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" className="nav-brand">
-            <img src={`${BASE}Logo.jpg`} alt="AI" style={{ width: 28 }} />
-            <span style={{ fontSize: 18, fontWeight: 800, color: '#111827' }}>StudyGuideAI</span>
+            <img src={`${BASE}Logo.jpg`} alt="StudyGuideAI Logo" style={{ width: 48, height: 48 }} />
           </Link>
           <SignedIn>
             <UserMenu />

@@ -74,8 +74,8 @@ function HomePage() {
             src={`${BASE}Logo.jpg`}
             alt="StudyGuideAI Logo"
             style={{
-              width: 140,
-              height: 140,
+              width: 210,
+              height: 210,
               objectFit: 'contain',
               marginBottom: 28,
               marginTop: -20,

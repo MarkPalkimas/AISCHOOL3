@@ -153,9 +153,8 @@ export default function Teacher() {
             alignItems: 'center',
           }}
         >
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
-            <img src={`${BASE}Logo.jpg`} alt="StudyGuideAI Logo" style={{ width: 32, height: 32 }} />
-            <span style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>StudyGuideAI</span>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <img src={`${BASE}Logo.jpg`} alt="StudyGuideAI Logo" style={{ width: 48, height: 48 }} />
           </Link>
           <SignedIn>
             <UserMenu />

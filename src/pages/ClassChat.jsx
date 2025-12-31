@@ -1,0 +1,296 @@
+// src/pages/ClassChat.jsx
+import React, { useState, useEffect, useRef } from 'react'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import { SignedIn, useUser, useClerk } from '@clerk/clerk-react'
+import { getClassByCode } from '../utils/storage'
+import { sendMessageToAI } from '../utils/openai'
+import UserMenu from '../components/UserMenu'
+
+import ReactMarkdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import remarkGfm from 'remark-gfm'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
+
+const BASE = import.meta.env.BASE_URL
+const abs = (path = '') => {
+  const base = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '/')
+  const rel = String(path).replace(/^\/+/, '')
+  return `${window.location.origin}${base}${rel}`
+}
+
+// Convert LaTeX parentheses notation to dollar signs for proper rendering
+function preprocessMath(content) {
+  if (!content) return content
+
+  // Convert \( ... \) to $ ... $
+  let processed = content.replace(/\\\((.*?)\\\)/g, '$$$1$$')
+
+  // Convert \[ ... \] to $$ ... $$
+  processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$$1$$$$')
+
+  // Also handle cases where AI uses ( ) without backslashes for inline math
+  // This is a bit more aggressive but helps catch common AI formatting
+  processed = processed.replace(/\( ([^)]*?[a-zA-Z_^{}\\]+[^)]*?) \)/g, '$$$1$$')
+
+  return processed
+}
+
+function MessageBubble({ role, content }) {
+  // Preprocess content to fix LaTeX formatting
+  const processedContent = preprocessMath(content)
+
+  return (
+    <div className={`msg ${role === 'user' ? 'user' : 'ai'}`}>
+      <div
+        style={{
+          width: 32, height: 32, borderRadius: 8, overflow: 'hidden',
+          border: '1px solid #e5e7eb', background: '#fff', display: 'grid', placeItems: 'center',
+          flexShrink: 0
+        }}
+      >
+        {role === 'user' ? (
+          <span style={{ fontSize: 14, color: '#6b7280', fontWeight: 600 }}>U</span>
+        ) : (
+          <img src={`${BASE}Logo.jpg`} alt="AI" style={{ width: 24, height: 24 }} />
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="who" style={{ marginBottom: 4, fontSize: 13, color: '#6B7280', fontWeight: 500 }}>
+          {role === 'user' ? 'You' : 'StudyGuideAI'}
+        </div>
+        <div className="bubble prose">
+          <ReactMarkdown
+            remarkPlugins={[remarkMath, remarkGfm]}
+            rehypePlugins={[rehypeKatex]}
+            components={{
+              code({ node, inline, className, children, ...props }) {
+                return !inline ? (
+                  <pre className={className} style={{ background: '#1E1E1E', color: '#D4D4D4', padding: '12px', borderRadius: '8px', overflowX: 'auto', border: '1px solid #333' }}>
+                    <code {...props} style={{ fontFamily: 'Consolas, Monaco, "Courier New", monospace', fontSize: '13px' }}>{children}</code>
+                  </pre>
+                ) : (
+                  <code className={className} {...props} style={{ background: '#F5F5F5', color: '#E01E5A', padding: '2px 5px', borderRadius: '3px', fontFamily: 'Consolas, Monaco, "Courier New", monospace', fontSize: '0.9em', border: '1px solid #E0E0E0' }}>
+                    {children}
+                  </code>
+                )
+              }
+            }}
+          >
+            {processedContent}
+          </ReactMarkdown>
+        </div>
+        <div className="tools" style={{ marginTop: 6, opacity: 0.6 }}>
+          <button
+            className="pill"
+            onClick={() => navigator.clipboard?.writeText(content)}
+            style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, border: '1px solid #E5E7EB', background: 'white', cursor: 'pointer' }}
+          >
+            Copy
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function ClassChat() {
+  const { classCode } = useParams()
+  const { user, isLoaded, isSignedIn } = useUser()
+  const { redirectToSignIn } = useClerk()
+  const navigate = useNavigate()
+
+  const [classData, setClassData] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const messagesEndRef = useRef(null)
+
+  useEffect(() => {
+    setClassData(getClassByCode(classCode))
+  }, [classCode])
+
+  useEffect(() => {
+    // Use setTimeout to ensure DOM has updated before scrolling
+    // This prevents the white screen issue when pressing Enter
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
+  }, [messages, isLoading])
+
+  if (!classData) {
+    return (
+      <div style={{ height: '100vh', display: 'grid', placeItems: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h2>Class Not Found</h2>
+          <button className="btn-primary" onClick={() => navigate('/student')}>Go to Student</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isLoaded) return null
+
+  const onSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!isSignedIn) {
+      redirectToSignIn({
+        redirectUrl: abs(`class/${classCode}`),
+        signUpUrl: abs(`class/${classCode}`)
+      })
+      return
+    }
+
+    if (!input.trim() || isLoading) return
+
+    const userMessage = input.trim()
+    setInput('')
+
+    const pending = [...messages, { role: 'user', content: userMessage }]
+    setMessages(pending)
+    setIsLoading(true)
+
+    try {
+      const reply = await sendMessageToAI(userMessage, classData.materials, pending)
+      setMessages([...pending, { role: 'assistant', content: reply }])
+    } catch (err) {
+      setError(err?.message || 'Error.')
+      setMessages([
+        ...pending,
+        { role: 'assistant', content: 'Sorry — I hit an error. Try again.' },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ height: '100vh', background: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <nav style={{ borderBottom: '1px solid #E5E7EB', padding: '12px 0' }}>
+        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Link to="/" className="nav-brand">
+            <img src={`${BASE}Logo.jpg`} alt="StudyGuideAI Logo" style={{ width: 32, height: 32 }} />
+            <span style={{ fontSize: 18, fontWeight: 800, color: '#111827' }}>StudyGuideAI</span>
+          </Link>
+          <SignedIn>
+            <UserMenu />
+          </SignedIn>
+        </div>
+      </nav>
+
+      <div className="container" style={{ padding: '18px 0 6px' }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800, color: '#111827' }}>{classData.name}</h1>
+        <div style={{ color: '#6B7280', fontSize: 13 }}>Class code: <code style={{ background: '#F3F4F6', padding: '2px 6px', borderRadius: 4 }}>{classData.code}</code></div>
+      </div>
+
+      <div className="container" style={{ flex: 1, padding: '8px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="feature-card" style={{ flex: 1, padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="chat-wrap" style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {messages.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#9CA3AF', marginTop: 'auto', marginBottom: 'auto' }}>
+                <p>Ask a question to get started.</p>
+              </div>
+            )}
+            {messages.map((m, i) => (
+              <MessageBubble key={i} role={m.role === 'user' ? 'user' : 'assistant'} content={m.content} />
+            ))}
+
+            {isLoading && (
+              <div className="msg ai">
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8, border: '1px solid #e5e7eb',
+                  background: '#fff', display: 'grid', placeItems: 'center'
+                }}>
+                  <img src={`${BASE}Logo.jpg`} alt="AI" style={{ width: 24 }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="who" style={{ marginBottom: 4, fontSize: 13, color: '#6B7280', fontWeight: 500 }}>StudyGuideAI</div>
+                  <div className="bubble prose" style={{ color: '#6B7280', fontStyle: 'italic' }}>Thinking…</div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* Live Preview - shows formatted markdown/math as you type */}
+        {input.trim() && (
+          <div style={{
+            marginTop: 16,
+            padding: '12px 16px',
+            background: '#F9FAFB',
+            border: '1px solid #E5E7EB',
+            borderRadius: 12,
+            fontSize: 14
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Preview
+            </div>
+            <div className="prose" style={{ maxHeight: 200, overflowY: 'auto' }}>
+              <ReactMarkdown
+                remarkPlugins={[remarkMath, remarkGfm]}
+                rehypePlugins={[rehypeKatex]}
+                components={{
+                  code({ node, inline, className, children, ...props }) {
+                    return !inline ? (
+                      <pre className={className} style={{ background: '#1E1E1E', color: '#D4D4D4', padding: '8px', borderRadius: '6px', overflowX: 'auto', fontSize: 13, border: '1px solid #333' }}>
+                        <code {...props} style={{ fontFamily: 'Consolas, Monaco, "Courier New", monospace' }}>{children}</code>
+                      </pre>
+                    ) : (
+                      <code className={className} {...props} style={{ background: '#F5F5F5', color: '#E01E5A', padding: '2px 5px', borderRadius: '3px', fontFamily: 'Consolas, Monaco, "Courier New", monospace', fontSize: '0.9em', border: '1px solid #E0E0E0' }}>
+                        {children}
+                      </code>
+                    )
+                  }
+                }}
+              >
+                {preprocessMath(input)}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
+
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #E5E7EB', background: 'white' }}>
+          <form onSubmit={onSubmit} className="chat-input" style={{ display: 'flex', gap: 10 }}>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  onSubmit(e)
+                }
+              }}
+              placeholder="Ask anything… (Shift+Enter for new line)"
+              rows={3}
+              style={{
+                flex: 1, padding: '14px 16px', borderRadius: 12,
+                border: '1px solid #D1D5DB', minHeight: 50, maxHeight: 120,
+                resize: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                fontSize: 15
+              }}
+              disabled={isLoading}
+            />
+            <button
+              className="btn-primary"
+              disabled={isLoading || !input.trim()}
+              style={{ padding: '0 24px', borderRadius: 12, height: 50, display: 'flex', alignItems: 'center', gap: 8 }}
+            >
+              {isLoading ? 'Sending…' : (
+                <>
+                  <span>Send</span>
+                  <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                </>
+              )}
+            </button>
+          </form>
+          {error && <p style={{ color: '#EF4444', marginTop: 8, fontSize: 14 }}>{error}</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+

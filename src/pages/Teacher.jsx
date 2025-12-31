@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { SignedIn, SignedOut, useUser, useClerk } from '@clerk/clerk-react'
-import { getTeacherClasses, createClass, updateClassMaterials } from '../utils/storage'
+import { getTeacherClasses, createClass, updateClassMaterials, createClassWithSync, updateClassMaterialsWithSync, getTeacherClassesWithSync } from '../utils/storage'
 import UserMenu from '../components/UserMenu'
 
 const BASE = import.meta.env.BASE_URL
@@ -41,7 +41,11 @@ export default function Teacher() {
 
   useEffect(() => {
     if (!isLoaded || !user) return
-    setClasses(getTeacherClasses(user.id))
+
+    // Use sync function to get classes from both local and Clerk
+    getTeacherClassesWithSync(user.id, user).then(syncedClasses => {
+      setClasses(syncedClasses)
+    })
   }, [isLoaded, user])
 
   const create = async (e) => {
@@ -51,8 +55,9 @@ export default function Teacher() {
     setBusy(true)
     await new Promise(r => setTimeout(r, 200))
 
-    const cls = createClass(user.id, newName.trim(), newSubject.trim())
-    setClasses(getTeacherClasses(user.id))
+    const cls = await createClassWithSync(user.id, newName.trim(), newSubject.trim(), user)
+    const updatedClasses = await getTeacherClassesWithSync(user.id, user)
+    setClasses(updatedClasses)
     setNewName('')
     setNewSubject('')
     setShowCreate(false)
@@ -92,8 +97,9 @@ export default function Teacher() {
     setBusy(true)
     await new Promise(r => setTimeout(r, 200))
 
-    updateClassMaterials(selected.code, materials)
-    if (user) setClasses(getTeacherClasses(user.id))
+    await updateClassMaterialsWithSync(selected.code, materials, user)
+    const updatedClasses = await getTeacherClassesWithSync(user.id, user)
+    setClasses(updatedClasses)
 
     setMaterials('')
     setSelected(null)
@@ -129,8 +135,15 @@ export default function Teacher() {
         cls.subject = subject
         cls.updatedAt = new Date().toISOString()
         localStorage.setItem('classai_classes', JSON.stringify(classesObj))
+
+        // Sync to Clerk
+        if (user) {
+          const { syncClassesToClerk } = await import('../utils/storage')
+          await syncClassesToClerk(user, classesObj)
+        }
       }
-      setClasses(getTeacherClasses(user.id))
+      const updatedClasses = await getTeacherClassesWithSync(user.id, user)
+      setClasses(updatedClasses)
     } catch (err) {
       console.error('Failed to update class details', err)
     }

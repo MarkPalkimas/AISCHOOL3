@@ -155,7 +155,7 @@ export function mergeEnrollments(localEnrollments, clerkEnrollments) {
 // Get all classes a student is enrolled in (merging local and Clerk data)
 export async function getStudentClassesWithSync(studentId, user) {
   const enrollments = getAllEnrollments()
-  const classes = getAllClasses()
+  const classes = await getAllClassesWithSync(user)  // Use synced classes instead of local only
 
   // Get local enrollments
   const localEnrollments = enrollments[studentId] || []
@@ -180,4 +180,100 @@ export async function getStudentClassesWithSync(studentId, user) {
   return mergedEnrollments
     .map(code => classes[code])
     .filter(c => c !== undefined)
+}
+
+// Sync all classes to Clerk user metadata (for cross-device persistence)
+export async function syncClassesToClerk(user, classes) {
+  if (!user) return false
+
+  try {
+    await user.update({
+      unsafeMetadata: {
+        ...user.unsafeMetadata,
+        allClasses: classes
+      }
+    })
+    return true
+  } catch (error) {
+    console.error('Failed to sync classes to Clerk:', error)
+    return false
+  }
+}
+
+// Get all classes from Clerk user metadata
+export function getClassesFromClerk(user) {
+  if (!user || !user.unsafeMetadata) return {}
+  return user.unsafeMetadata.allClasses || {}
+}
+
+// Merge local and Clerk classes
+export function mergeClasses(localClasses, clerkClasses) {
+  // Clerk classes take precedence for conflicts
+  return { ...localClasses, ...clerkClasses }
+}
+
+// Get all classes with sync from Clerk
+export async function getAllClassesWithSync(user) {
+  const localClasses = getAllClasses()
+
+  if (!user) return localClasses
+
+  const clerkClasses = getClassesFromClerk(user)
+  const merged = mergeClasses(localClasses, clerkClasses)
+
+  // Update localStorage with merged data
+  if (Object.keys(merged).length > Object.keys(localClasses).length) {
+    saveAllClasses(merged)
+  }
+
+  return merged
+}
+
+// Create a new class with Clerk sync
+export async function createClassWithSync(teacherId, className, subject = '', user = null) {
+  const classes = getAllClasses()
+  const code = generateClassCode()
+
+  const newClass = {
+    code,
+    name: className,
+    subject,
+    teacherId,
+    materials: '',
+    createdAt: new Date().toISOString()
+  }
+
+  classes[code] = newClass
+  saveAllClasses(classes)
+
+  // Sync to Clerk if user is provided
+  if (user) {
+    await syncClassesToClerk(user, classes)
+  }
+
+  return newClass
+}
+
+// Update class materials with Clerk sync
+export async function updateClassMaterialsWithSync(classCode, materials, user = null) {
+  const classes = getAllClasses()
+  if (classes[classCode]) {
+    classes[classCode].materials = materials
+    classes[classCode].updatedAt = new Date().toISOString()
+    saveAllClasses(classes)
+
+    // Sync to Clerk if user is provided
+    if (user) {
+      await syncClassesToClerk(user, classes)
+    }
+
+    return true
+  }
+  return false
+}
+
+// Get all classes for a specific teacher with sync
+export async function getTeacherClassesWithSync(teacherId, user) {
+  const classes = await getAllClassesWithSync(user)
+  return Object.values(classes).filter(c => c.teacherId === teacherId)
 }

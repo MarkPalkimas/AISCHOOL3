@@ -1,3 +1,4 @@
+//src/ClerkProviderWithRouter.jsx
 import React from 'react'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { useNavigate } from 'react-router-dom'
@@ -14,7 +15,6 @@ export default function ClerkProviderWithRouter({ children }) {
     <ClerkProvider
       publishableKey={clerkPubKey}
       navigate={(to) => navigate(to)}
-      //IMPORTANT: HashRouter requires hash auth URLs
       signInUrl="/#/sign-in"
       signUpUrl="/#/sign-up"
       afterSignInUrl="/"

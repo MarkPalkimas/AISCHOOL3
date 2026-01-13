@@ -1,5 +1,5 @@
 import React from 'react'
-import { Routes, Route, Link, useNavigate } from 'react-router-dom'
+import { Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom'
 import { SignedIn, SignedOut, SignInButton, useUser } from '@clerk/clerk-react'
 import Teacher from './pages/Teacher'
 import Student from './pages/Student'
@@ -7,6 +7,8 @@ import ClassChat from './pages/ClassChat'
 import Admin from './pages/Admin'
 import RoleSelector from './components/RoleSelector'
 import UserMenu from './components/UserMenu'
+import SignInPage from './pages/SignIn'
+import SignUpPage from './pages/SignUp'
 import { getUserRole, canAccessTeacherArea, canAccessStudentArea, canAccessAdminArea } from './utils/roles'
 
 function HomePage() {
@@ -49,10 +51,10 @@ function HomePage() {
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            <img 
-              src="/Logo.jpg" 
-              alt="ClassAI Logo" 
-              style={{ width: '32px', height: '32px', objectFit: 'contain' }} 
+            <img
+              src="/Logo.jpg"
+              alt="ClassAI Logo"
+              style={{ width: '32px', height: '32px', objectFit: 'contain' }}
             />
             <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
           </Link>
@@ -70,9 +72,9 @@ function HomePage() {
           AI-Powered Learning<br />
           <span style={{ color: '#3B82F6' }}>For Every Classroom</span>
         </h1>
-        
+
         <p className="hero-subtitle" style={{ marginBottom: '40px' }}>
-          Empower teachers to create personalized AI assistants loaded with their class materials. 
+          Empower teachers to create personalized AI assistants loaded with their class materials.
           Students get instant, accurate answers to their questions, 24/7.
         </p>
 
@@ -137,10 +139,10 @@ function HomePage() {
       <footer style={{ borderTop: '1px solid #E5E7EB', padding: '40px 24px', textAlign: 'center' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
-            <img 
-              src="/Logo.jpg" 
-              alt="ClassAI Logo" 
-              style={{ width: '24px', height: '24px', objectFit: 'contain' }} 
+            <img
+              src="/Logo.jpg"
+              alt="ClassAI Logo"
+              style={{ width: '24px', height: '24px', objectFit: 'contain' }}
             />
             <span style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>ClassAI</span>
           </div>
@@ -164,7 +166,7 @@ function ProtectedRoute({ children, requireRole }) {
 
     if (isLoaded && user) {
       const role = getUserRole(user)
-      
+
       if (!role) {
         return
       }
@@ -206,7 +208,7 @@ function ProtectedRoute({ children, requireRole }) {
   }
 
   if (!user) {
-    return children
+    return <Navigate to="/sign-in" replace />
   }
 
   const role = getUserRole(user)
@@ -227,10 +229,10 @@ function AccessDenied() {
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            <img 
-              src="/Logo.jpg" 
-              alt="ClassAI Logo" 
-              style={{ width: '32px', height: '32px', objectFit: 'contain' }} 
+            <img
+              src="/Logo.jpg"
+              alt="ClassAI Logo"
+              style={{ width: '32px', height: '32px', objectFit: 'contain' }}
             />
             <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
           </Link>
@@ -259,9 +261,9 @@ function AccessDenied() {
         <h1 style={{ fontSize: '32px', fontWeight: '700', color: '#111827', marginBottom: '16px' }}>
           Access Denied
         </h1>
-        
+
         <p style={{ fontSize: '18px', color: '#6B7280', marginBottom: '32px', lineHeight: '1.6' }}>
-          {role === 'student' 
+          {role === 'student'
             ? "This area is only accessible to teachers. Students can access the student portal to join classes and chat with AI tutors."
             : "You don't have permission to access this area."}
         </p>
@@ -285,6 +287,8 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/sign-in/*" element={<SignInPage />} />
+      <Route path="/sign-up/*" element={<SignUpPage />} />
       <Route path="/teacher" element={
         <ProtectedRoute requireRole="teacher">
           <Teacher />

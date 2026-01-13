@@ -20,29 +20,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          
+
       - name: Install dependencies
         run: npm install
-        
+
       - name: Build
         run: npm run build
         env:
           NODE_ENV: production
-          VITE_CLERK_PUBLISHABLE_KEY: pk_live_Y2xlcmsubXlzdHVkeWd1aWRlYWkuY29tJA
-        
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
-        
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'
-          
+          path: ./dist
+
   deploy:
     environment:
       name: github-pages

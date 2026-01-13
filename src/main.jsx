@@ -15,14 +15,14 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ClerkProvider
       publishableKey={clerkPubKey}
-      afterSignInUrl="/"
-      afterSignUpUrl="/"
-      signInUrl="/sign-in"
-      signUpUrl="/sign-up"
+      afterSignInUrl="/#/"
+      afterSignUpUrl="/#/"
+      signInUrl="/#/sign-in"
+      signUpUrl="/#/sign-up"
     >
       <HashRouter>
-  <App />
-    </HashRouter>
+        <App />
+      </HashRouter>
     </ClerkProvider>
   </React.StrictMode>,
 )

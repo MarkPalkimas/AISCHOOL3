@@ -33,7 +33,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_CLERK_PUBLISHABLE_KEY: pk_live_Y2xlcmsubXlzdHVkeWd1aWRlYWkuY29tJA
         
       - name: Setup Pages
         uses: actions/configure-pages@v4

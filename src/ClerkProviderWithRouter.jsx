@@ -15,8 +15,9 @@ export default function ClerkProviderWithRouter({ children }) {
     <ClerkProvider
       publishableKey={clerkPubKey}
       navigate={(to) => navigate(to)}
-      signInUrl="/#/sign-in"
-      signUpUrl="/#/sign-up"
+      //IMPORTANT: With HashRouter, DO NOT include "/#/" here
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
       afterSignInUrl="/"
       afterSignUpUrl="/"
     >

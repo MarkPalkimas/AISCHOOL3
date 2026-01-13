@@ -20,9 +20,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
     >
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <HashRouter>
+  <App />
+    </HashRouter>
     </ClerkProvider>
   </React.StrictMode>,
 )

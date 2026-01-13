@@ -1,4 +1,4 @@
-//src/pages/SignInPage.jsx
+//src/pages/SignIn.jsx  (or whatever your filename is)
 import React from 'react'
 import { SignIn } from '@clerk/clerk-react'
 
@@ -13,7 +13,12 @@ export default function SignInPage() {
         background: '#f9fafb',
       }}
     >
-      <SignIn routing="hash" path="/sign-in" afterSignInUrl="/" />
+      <SignIn
+        //IMPORTANT: HashRouter already handles the hash, so Clerk should be "path"
+        routing="path"
+        path="/sign-in"
+        afterSignInUrl="/"
+      />
     </div>
   )
 }

@@ -1,3 +1,4 @@
+//src/pages/SignUpPage.jsx
 import React from 'react'
 import { SignUp } from '@clerk/clerk-react'
 
@@ -12,7 +13,7 @@ export default function SignUpPage() {
         background: '#f9fafb',
       }}
     >
-      <SignUp routing="hash" path="/sign-up" signInUrl="/sign-in" />
+      <SignUp routing="hash" path="/sign-up" afterSignUpUrl="/" />
     </div>
   )
 }

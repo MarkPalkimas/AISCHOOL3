@@ -4,38 +4,51 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { ROLES } from '../utils/roles'
 
 function RoleSelector() {
-  const { user } = useUser()
+  const { user, isLoaded } = useUser()
   const navigate = useNavigate()
   const location = useLocation()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  const goAfterRole = (role) => {
+    //Redirect based on which page they were trying to access
+    if (location.pathname.includes('/teacher')) {
+      if (role === ROLES.TEACHER || role === ROLES.ADMIN) {
+        navigate('/teacher', { replace: true })
+      } else {
+        navigate('/access-denied', { replace: true })
+      }
+      return
+    }
+
+    if (location.pathname.includes('/student')) {
+      navigate('/student', { replace: true })
+      return
+    }
+
+    //Default redirect based on role
+    if (role === ROLES.TEACHER || role === ROLES.ADMIN) {
+      navigate('/teacher', { replace: true })
+    } else {
+      navigate('/student', { replace: true })
+    }
+  }
+
   const handleRoleSelect = async (role) => {
     setError('')
     setIsSubmitting(true)
+
     try {
-      await user.update({ publicMetadata: { role: role } })
-      
-      // Redirect based on which page they were trying to access
-      if (location.pathname.includes('/teacher')) {
-        if (role === ROLES.TEACHER || role === ROLES.ADMIN) {
-          navigate('/teacher')
-        } else {
-          navigate('/access-denied')
-        }
-      } else if (location.pathname.includes('/student')) {
-        navigate('/student')
-      } else {
-        // Default redirect based on role
-        if (role === ROLES.TEACHER || role === ROLES.ADMIN) {
-          navigate('/teacher')
-        } else {
-          navigate('/student')
-        }
+      if (!isLoaded || !user) {
+        throw new Error('Clerk not loaded or user missing')
       }
-      
-      window.location.reload()
+
+      await user.update({ publicMetadata: { role } })
+      await user.reload()
+
+      goAfterRole(role)
     } catch (err) {
+      console.error(err)
       setError('Failed to set role. Please try again.')
       setIsSubmitting(false)
     }
@@ -56,7 +69,19 @@ function RoleSelector() {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <button onClick={() => handleRoleSelect(ROLES.STUDENT)} disabled={isSubmitting} style={{ padding: '24px', background: 'white', border: '2px solid #E5E7EB', borderRadius: '12px', cursor: isSubmitting ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: isSubmitting ? 0.6 : 1 }}>
+          <button
+            onClick={() => handleRoleSelect(ROLES.STUDENT)}
+            disabled={isSubmitting || !isLoaded}
+            style={{
+              padding: '24px',
+              background: 'white',
+              border: '2px solid #E5E7EB',
+              borderRadius: '12px',
+              cursor: (isSubmitting || !isLoaded) ? 'not-allowed' : 'pointer',
+              textAlign: 'left',
+              opacity: (isSubmitting || !isLoaded) ? 0.6 : 1
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'start', gap: '16px' }}>
               <div style={{ width: '48px', height: '48px', background: '#3B82F6', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <svg style={{ width: '24px', height: '24px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,7 +95,19 @@ function RoleSelector() {
             </div>
           </button>
 
-          <button onClick={() => handleRoleSelect(ROLES.TEACHER)} disabled={isSubmitting} style={{ padding: '24px', background: 'white', border: '2px solid #E5E7EB', borderRadius: '12px', cursor: isSubmitting ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: isSubmitting ? 0.6 : 1 }}>
+          <button
+            onClick={() => handleRoleSelect(ROLES.TEACHER)}
+            disabled={isSubmitting || !isLoaded}
+            style={{
+              padding: '24px',
+              background: 'white',
+              border: '2px solid #E5E7EB',
+              borderRadius: '12px',
+              cursor: (isSubmitting || !isLoaded) ? 'not-allowed' : 'pointer',
+              textAlign: 'left',
+              opacity: (isSubmitting || !isLoaded) ? 0.6 : 1
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'start', gap: '16px' }}>
               <div style={{ width: '48px', height: '48px', background: '#10B981', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <svg style={{ width: '24px', height: '24px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

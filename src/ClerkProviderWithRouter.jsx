@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 export default function ClerkProviderWithRouter({ children }) {
   const navigate = useNavigate();
   const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-  
+
   if (!clerkPubKey) {
     return (
       <div style={{ padding: 24, fontFamily: "monospace" }}>
@@ -13,15 +13,15 @@ export default function ClerkProviderWithRouter({ children }) {
       </div>
     );
   }
-  
+
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
-      navigate={(to) => navigate(to)}  // Remove the hash stripping
-      signInUrl="/sign-in"              // Remove the /# prefix
-      signUpUrl="/sign-up"              // Remove the /# prefix
-      afterSignInUrl="/"                // Remove the /# prefix
-      afterSignUpUrl="/"                // Remove the /# prefix
+      navigate={(to) => navigate(to)}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      afterSignInUrl="/"
+      afterSignUpUrl="/"
     >
       {children}
     </ClerkProvider>

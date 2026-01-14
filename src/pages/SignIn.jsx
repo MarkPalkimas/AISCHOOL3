@@ -1,10 +1,10 @@
 import React from "react";
-import { SignUp } from "@clerk/clerk-react";
+import { SignIn } from "@clerk/clerk-react";
 
-export default function SignUpPage() {
+export default function SignInPage() {
   return (
-    <div style={{ display:"flex", justifyContent:"center", alignItems:"center", minHeight:"100vh", background:"#f9fafb" }}>
-      <SignUp routing="hash" path="/sign-up" afterSignUpUrl="/#/" />
+    <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', background:'#f9fafb' }}>
+      <SignIn routing="path" path="/sign-in" afterSignInUrl="/" />
     </div>
   );
 }

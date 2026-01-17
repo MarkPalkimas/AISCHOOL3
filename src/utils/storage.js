@@ -4,7 +4,7 @@
 // This implementation uses localStorage which is browser-specific and does NOT sync across devices.
 // All functions use Clerk user IDs (user.id) to associate data with user accounts, but the data
 // is still stored locally in the browser's localStorage.
-// 
+//
 // For true cross-device persistence, this would need to be replaced with a backend database
 // (e.g., Firebase, Supabase, PostgreSQL) that stores data server-side.
 //
@@ -45,10 +45,38 @@ function saveAllEnrollments(enrollments) {
   localStorage.setItem('classai_enrollments', JSON.stringify(enrollments))
 }
 
+// Remove deleted/nonexistent classes from enrollments (safety + keeps dashboards clean)
+export function cleanupDeletedClasses() {
+  const classes = getAllClasses()
+  const enrollments = getAllEnrollments()
+
+  let changed = false
+
+  for (const studentId of Object.keys(enrollments)) {
+    const list = enrollments[studentId] || []
+    const filtered = list.filter(code => !!classes[code])
+    if (filtered.length !== list.length) {
+      enrollments[studentId] = filtered
+      changed = true
+    }
+  }
+
+  if (changed) {
+    saveAllEnrollments(enrollments)
+  }
+
+  return changed
+}
+
 // Create a new class (teacher only)
 export function createClass(teacherId, className, subject = '') {
   const classes = getAllClasses()
-  const code = generateClassCode()
+  let code = generateClassCode()
+
+  // Ensure uniqueness (very low chance of collision but still)
+  while (classes[code]) {
+    code = generateClassCode()
+  }
 
   const newClass = {
     code,
@@ -89,6 +117,37 @@ export function updateClassMaterials(classCode, materials) {
   return false
 }
 
+// Teacher deletes a class (and it is automatically removed from all student dashboards)
+export function deleteClass(teacherId, classCode) {
+  const classes = getAllClasses()
+  const target = classes[classCode]
+
+  if (!target) return false
+  if (target.teacherId !== teacherId) return false
+
+  // Delete the class
+  delete classes[classCode]
+  saveAllClasses(classes)
+
+  // Remove from all student enrollments
+  const enrollments = getAllEnrollments()
+  let changed = false
+
+  for (const studentId of Object.keys(enrollments)) {
+    const list = enrollments[studentId] || []
+    if (list.includes(classCode)) {
+      enrollments[studentId] = list.filter(code => code !== classCode)
+      changed = true
+    }
+  }
+
+  if (changed) {
+    saveAllEnrollments(enrollments)
+  }
+
+  return true
+}
+
 // Student joins a class
 export function joinClass(studentId, classCode) {
   const classes = getAllClasses()
@@ -118,6 +177,9 @@ export function joinClass(studentId, classCode) {
 
 // Get all classes a student is enrolled in
 export function getStudentClasses(studentId) {
+  // Clean up any deleted classes so the dashboard stays pristine
+  cleanupDeletedClasses()
+
   const enrollments = getAllEnrollments()
   const classes = getAllClasses()
 

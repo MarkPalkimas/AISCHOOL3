@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
@@ -8,6 +8,9 @@ import { ROLES } from '../utils/roles'
 function Teacher() {
   const { user, isLoaded } = useUser()
   const navigate = useNavigate()
+
+  const createModalRef = useRef(null)
+  const uploadModalRef = useRef(null)
 
   const role = user?.publicMetadata?.role || user?.unsafeMetadata?.role || null
 
@@ -34,6 +37,42 @@ function Teacher() {
   const [selectedClass, setSelectedClass] = useState(null)
   const [materials, setMaterials] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+
+  //Close modals on ESC (clean, modern modal behavior)
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return
+
+      if (showUploadModal) {
+        setShowUploadModal(false)
+        setMaterials('')
+        setSelectedClass(null)
+        return
+      }
+
+      if (showCreateModal) {
+        setShowCreateModal(false)
+        setNewClassName('')
+        setNewClassSubject('')
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [showCreateModal, showUploadModal])
+
+  //Auto-focus the first input when modals open
+  useEffect(() => {
+    if (showCreateModal) {
+      setTimeout(() => createModalRef.current?.focus(), 0)
+    }
+  }, [showCreateModal])
+
+  useEffect(() => {
+    if (showUploadModal) {
+      setTimeout(() => uploadModalRef.current?.focus(), 0)
+    }
+  }, [showUploadModal])
 
   useEffect(() => {
     if (user) {
@@ -192,8 +231,26 @@ function Teacher() {
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onMouseDown={(e) => {
+            if (e.target !== e.currentTarget) return
+            setShowCreateModal(false)
+            setNewClassName('')
+            setNewClassSubject('')
+          }}
+          style={{ backdropFilter: 'blur(2px)' }}
+        >
+          <div
+            className="bg-white rounded-lg p-8 max-w-md w-full"
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              borderRadius: '14px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.18)',
+              transform: 'translateY(0px)',
+              animation: 'modalIn 140ms ease-out'
+            }}
+          >
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Class</h2>
             <form onSubmit={handleCreateClass}>
               <div style={{ marginBottom: '20px' }}>
@@ -206,16 +263,28 @@ function Teacher() {
                 <input
                   type="text"
                   id="className"
+                  ref={createModalRef}
                   value={newClassName}
                   onChange={(e) => setNewClassName(e.target.value)}
                   placeholder="e.g., Biology 101"
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    border: '1px solid #D1D5DB',
+                    border: '1px solid #E5E7EB',
                     borderRadius: '6px',
                     fontSize: '16px',
                     boxSizing: 'border-box',
+                    outline: 'none',
+                    boxShadow: '0 0 0 0 rgba(59, 130, 246, 0)',
+                    transition: 'box-shadow 0.15s, border-color 0.15s'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#3B82F6'
+                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#E5E7EB'
+                    e.currentTarget.style.boxShadow = '0 0 0 0 rgba(59, 130, 246, 0)'
                   }}
                   required
                 />
@@ -237,10 +306,21 @@ function Teacher() {
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    border: '1px solid #D1D5DB',
+                    border: '1px solid #E5E7EB',
                     borderRadius: '6px',
                     fontSize: '16px',
                     boxSizing: 'border-box',
+                    outline: 'none',
+                    boxShadow: '0 0 0 0 rgba(59, 130, 246, 0)',
+                    transition: 'box-shadow 0.15s, border-color 0.15s'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#3B82F6'
+                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#E5E7EB'
+                    e.currentTarget.style.boxShadow = '0 0 0 0 rgba(59, 130, 246, 0)'
                   }}
                 />
               </div>
@@ -277,8 +357,26 @@ function Teacher() {
       )}
 
       {showUploadModal && selectedClass && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ overflowY: 'auto' }}>
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full" style={{ margin: '20px' }}>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          style={{ overflowY: 'auto', backdropFilter: 'blur(2px)' }}
+          onMouseDown={(e) => {
+            if (e.target !== e.currentTarget) return
+            setShowUploadModal(false)
+            setMaterials('')
+            setSelectedClass(null)
+          }}
+        >
+          <div
+            className="bg-white rounded-lg p-8 max-w-2xl w-full"
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              margin: '20px',
+              borderRadius: '14px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.18)',
+              animation: 'modalIn 140ms ease-out'
+            }}
+          >
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Class Materials</h2>
             <p style={{ color: '#6B7280', marginBottom: '24px' }}>
               {selectedClass.name} - Code: <strong>{selectedClass.code}</strong>
@@ -294,6 +392,7 @@ function Teacher() {
                 </label>
                 <textarea
                   id="materials"
+                  ref={uploadModalRef}
                   value={materials}
                   onChange={(e) => setMaterials(e.target.value)}
                   placeholder="Enter your syllabus, course description, key topics, lecture notes, or any information you want the AI to reference..."
@@ -301,12 +400,23 @@ function Teacher() {
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    border: '1px solid #D1D5DB',
+                    border: '1px solid #E5E7EB',
                     borderRadius: '6px',
                     fontSize: '14px',
                     boxSizing: 'border-box',
                     fontFamily: 'inherit',
                     resize: 'vertical',
+                    outline: 'none',
+                    boxShadow: '0 0 0 0 rgba(59, 130, 246, 0)',
+                    transition: 'box-shadow 0.15s, border-color 0.15s'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#3B82F6'
+                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#E5E7EB'
+                    e.currentTarget.style.boxShadow = '0 0 0 0 rgba(59, 130, 246, 0)'
                   }}
                   required
                 />
@@ -345,6 +455,13 @@ function Teacher() {
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes modalIn {
+          from { opacity: 0; transform: translateY(8px) scale(0.985); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
     </div>
   )
 }

@@ -1,19 +1,57 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
-import { createClass, getTeacherClasses, updateClassMaterials, deleteClass } from '../utils/storage'
+import { createClass, deleteClass, getTeacherClasses, updateClassMaterials } from '../utils/storage'
 import { ROLES } from '../utils/roles'
+import { extractTextFromFile, normalizeForMaterialsAppend } from '../utils/fileText'
 
 function Teacher() {
   const { user, isLoaded } = useUser()
   const navigate = useNavigate()
 
-  const createModalRef = useRef(null)
-  const uploadModalRef = useRef(null)
+  const role = user?.publicMetadata?.role || user?.unsafeMetadata?.role || null
+
+  const createNameRef = useRef(null)
+  const uploadTextRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  const role = user?.publicMetadata?.role || user?.unsafeMetadata?.role || null
+  const UI_LIMITS = {
+    MATERIALS_MAX_UI_CHARS: 22000, //keeps UI snappy
+    APPEND_FILE_MAX_CHARS: 9000, //per file extracted text cap
+    MAX_TEXT_FILE_MB: 1,
+    MAX_PDF_DOCX_MB: 10
+  }
+
+  const [classes, setClasses] = useState([])
+
+  const [toast, setToast] = useState(null)
+
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newClassName, setNewClassName] = useState('')
+  const [newClassSubject, setNewClassSubject] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [selectedClass, setSelectedClass] = useState(null)
+  const [materials, setMaterials] = useState('')
+  const [isSavingMaterials, setIsSavingMaterials] = useState(false)
+  const [isParsingFile, setIsParsingFile] = useState(false)
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [classToDelete, setClassToDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  function showToast(message, type = 'success') {
+    setToast({ message, type })
+    window.clearTimeout(showToast._t)
+    showToast._t = window.setTimeout(() => setToast(null), 2300)
+  }
+
+  function refreshClasses() {
+    if (!user) return
+    setClasses(getTeacherClasses(user.id))
+  }
 
   useEffect(() => {
     if (!isLoaded) return
@@ -26,43 +64,10 @@ function Teacher() {
       else navigate('/access-denied', { replace: true })
       return
     }
+    refreshClasses()
   }, [isLoaded, user, role, navigate])
 
-  const [classes, setClasses] = useState([])
-
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newClassName, setNewClassName] = useState('')
-  const [newClassSubject, setNewClassSubject] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
-
-  const [showUploadModal, setShowUploadModal] = useState(false)
-  const [selectedClass, setSelectedClass] = useState(null)
-  const [materials, setMaterials] = useState('')
-  const [isUploading, setIsUploading] = useState(false)
-
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [classToDelete, setClassToDelete] = useState(null)
-  const [isDeleting, setIsDeleting] = useState(false)
-
-  const [toast, setToast] = useState(null)
-
-  function showToast(message, type = 'success') {
-    setToast({ message, type })
-    window.clearTimeout(showToast._t)
-    showToast._t = window.setTimeout(() => setToast(null), 2200)
-  }
-
-  function refreshClasses() {
-    if (!user) return
-    setClasses(getTeacherClasses(user.id))
-  }
-
-  useEffect(() => {
-    if (!user) return
-    refreshClasses()
-  }, [user])
-
-  // ESC closes modals
+  //ESC closes modals
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.key !== 'Escape') return
@@ -75,8 +80,8 @@ function Teacher() {
 
       if (showUploadModal) {
         setShowUploadModal(false)
-        setMaterials('')
         setSelectedClass(null)
+        setMaterials('')
         return
       }
 
@@ -91,62 +96,14 @@ function Teacher() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [showCreateModal, showUploadModal, showDeleteModal])
 
+  //Auto focus
   useEffect(() => {
-    if (showCreateModal) setTimeout(() => createModalRef.current?.focus(), 0)
+    if (showCreateModal) setTimeout(() => createNameRef.current?.focus(), 0)
   }, [showCreateModal])
 
   useEffect(() => {
-    if (showUploadModal) setTimeout(() => uploadModalRef.current?.focus(), 0)
+    if (showUploadModal) setTimeout(() => uploadTextRef.current?.focus(), 0)
   }, [showUploadModal])
-
-  const handleCreateClass = async (e) => {
-    e.preventDefault()
-    if (!newClassName.trim() || !user) return
-
-    setIsCreating(true)
-    await new Promise((resolve) => setTimeout(resolve, 250))
-
-    const newClass = createClass(user.id, newClassName.trim(), newClassSubject.trim())
-    refreshClasses()
-
-    setNewClassName('')
-    setNewClassSubject('')
-    setShowCreateModal(false)
-    setIsCreating(false)
-
-    if (newClass) {
-      openUploadModal(newClass)
-      showToast('Class created')
-    }
-  }
-
-  const openUploadModal = (classItem) => {
-    setSelectedClass(classItem)
-    setMaterials(classItem.materials || '')
-    setShowUploadModal(true)
-  }
-
-  const handleUploadMaterials = async (e) => {
-    e.preventDefault()
-    if (!selectedClass || !user) return
-    if (!materials.trim()) {
-      showToast('Add some materials first', 'error')
-      return
-    }
-
-    setIsUploading(true)
-    await new Promise((resolve) => setTimeout(resolve, 300))
-
-    updateClassMaterials(selectedClass.code, materials.trim())
-    refreshClasses()
-
-    setShowUploadModal(false)
-    setMaterials('')
-    setSelectedClass(null)
-    setIsUploading(false)
-
-    showToast('Materials saved')
-  }
 
   async function copyToClipboard(text) {
     try {
@@ -170,22 +127,71 @@ function Teacher() {
     }
   }
 
-  const handleCopy = async (code) => {
+  async function handleCopy(code) {
     const ok = await copyToClipboard(code)
     if (ok) showToast('Copied class code')
     else showToast('Copy failed on this browser', 'error')
   }
 
-  const openDeleteModal = (classItem) => {
+  function openUploadModalForClass(classItem) {
+    setSelectedClass(classItem)
+    setMaterials(classItem.materials || '')
+    setShowUploadModal(true)
+  }
+
+  function openDeleteModalForClass(classItem) {
     setClassToDelete(classItem)
     setShowDeleteModal(true)
   }
 
-  const handleDeleteClass = async () => {
+  async function handleCreateClass(e) {
+    e.preventDefault()
+    if (!user) return
+    if (!newClassName.trim()) return
+
+    setIsCreating(true)
+    await new Promise((r) => setTimeout(r, 200))
+
+    const created = createClass(user.id, newClassName.trim(), newClassSubject.trim())
+    refreshClasses()
+
+    setIsCreating(false)
+    setShowCreateModal(false)
+    setNewClassName('')
+    setNewClassSubject('')
+
+    showToast('Class created')
+    if (created) openUploadModalForClass(created)
+  }
+
+  async function handleSaveMaterials(e) {
+    e.preventDefault()
+    if (!selectedClass) return
+
+    if (!materials.trim()) {
+      showToast('Add some materials first', 'error')
+      return
+    }
+
+    setIsSavingMaterials(true)
+    await new Promise((r) => setTimeout(r, 200))
+
+    updateClassMaterials(selectedClass.code, materials.trim())
+    refreshClasses()
+
+    setIsSavingMaterials(false)
+    setShowUploadModal(false)
+    setSelectedClass(null)
+    setMaterials('')
+
+    showToast('Materials saved')
+  }
+
+  async function handleConfirmDelete() {
     if (!user || !classToDelete) return
 
     setIsDeleting(true)
-    await new Promise((resolve) => setTimeout(resolve, 250))
+    await new Promise((r) => setTimeout(r, 200))
 
     const ok = deleteClass(user.id, classToDelete.code)
     refreshClasses()
@@ -198,56 +204,61 @@ function Teacher() {
     else showToast('Delete failed', 'error')
   }
 
-  const handleChooseFile = () => {
+  function handleChooseFile() {
+    if (isParsingFile) return
     fileInputRef.current?.click()
   }
 
-  const handleFileSelected = async (e) => {
+  async function handleFileSelected(e) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
 
     const name = (file.name || '').toLowerCase()
-    const allowed = ['.txt', '.md', '.csv', '.json']
-    const isAllowed = allowed.some(ext => name.endsWith(ext))
+    const isPdf = name.endsWith('.pdf') || file.type === 'application/pdf'
+    const isDocx =
+      name.endsWith('.docx') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    const isTextLike = name.endsWith('.txt') || name.endsWith('.md') || name.endsWith('.csv') || name.endsWith('.json')
 
-    if (!isAllowed) {
-      showToast('Only .txt, .md, .csv, .json supported for now', 'error')
+    if (!isPdf && !isDocx && !isTextLike) {
+      showToast('Upload PDF, DOCX, TXT, MD, CSV, or JSON', 'error')
       return
     }
 
-    if (file.size > 1024 * 1024) {
+    const sizeMB = file.size / (1024 * 1024)
+    if ((isPdf || isDocx) && sizeMB > UI_LIMITS.MAX_PDF_DOCX_MB) {
+      showToast('File too large (max 10MB)', 'error')
+      return
+    }
+    if (isTextLike && sizeMB > UI_LIMITS.MAX_TEXT_FILE_MB) {
       showToast('File too large (max 1MB)', 'error')
       return
     }
 
-    const text = await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result || '')
-      reader.onerror = () => reject(new Error('read failed'))
-      reader.readAsText(file)
-    }).catch(() => null)
+    setIsParsingFile(true)
+    try {
+      const raw = await extractTextFromFile(file)
+      if (!raw || !raw.trim()) {
+        showToast('Could not extract text from that file', 'error')
+        setIsParsingFile(false)
+        return
+      }
 
-    if (!text) {
-      showToast('Could not read file', 'error')
-      return
+      const block = normalizeForMaterialsAppend(file.name, raw, UI_LIMITS.APPEND_FILE_MAX_CHARS)
+
+      setMaterials((prev) => {
+        const base = (prev || '').trim()
+        const next = base ? `${base}\n\n${block}` : block
+        return next.length > UI_LIMITS.MATERIALS_MAX_UI_CHARS ? next.slice(0, UI_LIMITS.MATERIALS_MAX_UI_CHARS) : next
+      })
+
+      showToast('File added to materials')
+    } catch (err) {
+      showToast('File parse failed', 'error')
+    } finally {
+      setIsParsingFile(false)
     }
-
-    const cleaned = String(text).replace(/\r/g, '').trim()
-    if (!cleaned) {
-      showToast('File was empty', 'error')
-      return
-    }
-
-    //Append cleanly
-    setMaterials((prev) => {
-      const base = (prev || '').trim()
-      const next = base ? `${base}\n\n--- FILE: ${file.name} ---\n${cleaned}` : `--- FILE: ${file.name} ---\n${cleaned}`
-      //Light cap to avoid local UI lag (storage.js also caps when saving)
-      return next.length > 22000 ? next.slice(0, 22000) : next
-    })
-
-    showToast('File added to materials')
   }
 
   return (
@@ -260,12 +271,12 @@ function Teacher() {
             padding: '0 24px',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: 'center'
           }}
         >
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            <img src="/Logo.jpg" alt="ClassAI Logo" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
-            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
+            <img src="/Logo.jpg" alt="ClassAI Logo" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+            <span style={{ fontSize: 20, fontWeight: 800, color: '#111827' }}>ClassAI</span>
           </Link>
           <UserMenu />
         </div>
@@ -281,7 +292,7 @@ function Teacher() {
             zIndex: 9999,
             padding: '10px 12px',
             borderRadius: 12,
-            fontWeight: 800,
+            fontWeight: 900,
             fontSize: 12,
             background: toast.type === 'error' ? '#FEF2F2' : '#ECFDF5',
             border: `1px solid ${toast.type === 'error' ? '#FECACA' : '#A7F3D0'}`,
@@ -293,42 +304,41 @@ function Teacher() {
         </div>
       )}
 
-      <div style={{ padding: '40px 24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ padding: '40px 24px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32, flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h1 style={{ fontSize: 32, fontWeight: 800, color: '#111827', marginBottom: 8 }}>Teacher Dashboard</h1>
+            <h1 style={{ fontSize: 32, fontWeight: 900, color: '#111827', marginBottom: 8 }}>Teacher Dashboard</h1>
             <p style={{ color: '#6B7280' }}>Create classes and upload materials for your AI tutors</p>
           </div>
 
-          <button onClick={() => setShowCreateModal(true)} className="btn-primary">
+          <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
             Create New Class
           </button>
         </div>
 
         {classes.length === 0 ? (
           <div className="feature-card" style={{ textAlign: 'center', padding: '64px 32px' }}>
-            <h3 style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 24 }}>No classes yet</h3>
-            <button onClick={() => setShowCreateModal(true)} className="btn-primary">
+            <h3 style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 24 }}>No classes yet</h3>
+            <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
               Create Your First Class
             </button>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 24 }}>
-            {classes.map((classItem) => {
-              const hasMaterials = !!(classItem.materials && classItem.materials.trim().length > 0)
-
+            {classes.map((c) => {
+              const hasMaterials = !!(c.materials && c.materials.trim().length > 0)
               return (
-                <div key={classItem.code} className="feature-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                <div key={c.code} className="feature-card" style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
                       <span
                         style={{
                           padding: '4px 12px',
-                          background: hasMaterials ? '#DEF7EC' : '#FEF3C7',
-                          color: hasMaterials ? '#059669' : '#D97706',
                           borderRadius: 999,
                           fontSize: 12,
-                          fontWeight: 800
+                          fontWeight: 900,
+                          background: hasMaterials ? '#DEF7EC' : '#FEF3C7',
+                          color: hasMaterials ? '#059669' : '#D97706'
                         }}
                       >
                         {hasMaterials ? 'Active' : 'Setup Needed'}
@@ -336,7 +346,7 @@ function Teacher() {
 
                       <button
                         type="button"
-                        onClick={() => openDeleteModal(classItem)}
+                        onClick={() => openDeleteModalForClass(c)}
                         style={{
                           padding: '6px 10px',
                           background: 'white',
@@ -353,20 +363,16 @@ function Teacher() {
                       </button>
                     </div>
 
-                    <h3 style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 4 }}>{classItem.name}</h3>
-                    {!!classItem.subject && (
-                      <p style={{ color: '#6B7280', fontSize: 14, marginBottom: 16 }}>{classItem.subject}</p>
-                    )}
+                    <h3 style={{ fontSize: 20, fontWeight: 900, color: '#111827', marginBottom: 4 }}>{c.name}</h3>
+                    {!!c.subject && <p style={{ color: '#6B7280', fontSize: 14, marginBottom: 16 }}>{c.subject}</p>}
 
-                    <div style={{ padding: 12, background: '#F9FAFB', borderRadius: 12, marginBottom: 16 }}>
-                      <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 6, fontWeight: 700 }}>Class Code</p>
+                    <div style={{ padding: 12, background: '#F9FAFB', borderRadius: 12, marginBottom: 16, border: '1px solid #EEF2F7' }}>
+                      <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 6, fontWeight: 800 }}>Class Code</p>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                        <span style={{ fontSize: 18, fontWeight: 900, color: '#111827', fontFamily: 'monospace' }}>
-                          {classItem.code}
-                        </span>
+                        <span style={{ fontSize: 18, fontWeight: 900, color: '#111827', fontFamily: 'monospace' }}>{c.code}</span>
                         <button
                           type="button"
-                          onClick={() => handleCopy(classItem.code)}
+                          onClick={() => handleCopy(c.code)}
                           style={{
                             padding: '6px 10px',
                             background: 'white',
@@ -374,9 +380,8 @@ function Teacher() {
                             borderRadius: 12,
                             cursor: 'pointer',
                             fontSize: 12,
-                            color: '#374151',
-                            whiteSpace: 'nowrap',
-                            fontWeight: 900
+                            fontWeight: 900,
+                            color: '#374151'
                           }}
                         >
                           Copy
@@ -385,7 +390,7 @@ function Teacher() {
                     </div>
                   </div>
 
-                  <button onClick={() => openUploadModal(classItem)} className="btn-secondary" style={{ width: '100%' }}>
+                  <button className="btn-secondary" style={{ width: '100%' }} onClick={() => openUploadModalForClass(c)}>
                     {hasMaterials ? 'Update Materials' : 'Upload Materials'}
                   </button>
                 </div>
@@ -395,46 +400,41 @@ function Teacher() {
         )}
       </div>
 
-      {/* Hidden file input for materials */}
+      {/* hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.md,.csv,.json,text/plain,text/markdown,application/json,text/csv"
+        accept=".pdf,.docx,.txt,.md,.csv,.json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,application/json,text/csv"
         style={{ display: 'none' }}
         onChange={handleFileSelected}
       />
 
-      {/* Create Modal */}
+      {/* Create Class Modal */}
       {showCreateModal && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          style={{ backdropFilter: 'blur(2px)' }}
           onMouseDown={(e) => {
             if (e.target !== e.currentTarget) return
             setShowCreateModal(false)
             setNewClassName('')
             setNewClassSubject('')
           }}
-          style={{ backdropFilter: 'blur(2px)' }}
         >
           <div
             className="bg-white rounded-lg p-8 max-w-md w-full"
+            style={{ borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.18)', animation: 'modalIn 140ms ease-out' }}
             onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              borderRadius: 14,
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.18)',
-              animation: 'modalIn 140ms ease-out'
-            }}
           >
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Class</h2>
+
             <form onSubmit={handleCreateClass}>
               <div style={{ marginBottom: 20 }}>
-                <label htmlFor="className" style={{ display: 'block', fontSize: 14, fontWeight: 800, color: '#374151', marginBottom: 8 }}>
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 900, color: '#374151', marginBottom: 8 }}>
                   Class Name *
                 </label>
                 <input
-                  type="text"
-                  id="className"
-                  ref={createModalRef}
+                  ref={createNameRef}
                   value={newClassName}
                   onChange={(e) => setNewClassName(e.target.value)}
                   placeholder="e.g., Biology 101"
@@ -444,21 +444,18 @@ function Teacher() {
                     border: '1px solid #E5E7EB',
                     borderRadius: 12,
                     fontSize: 16,
-                    boxSizing: 'border-box',
                     outline: 'none',
-                    transition: 'box-shadow 0.15s, border-color 0.15s'
+                    boxSizing: 'border-box'
                   }}
                   required
                 />
               </div>
 
               <div style={{ marginBottom: 24 }}>
-                <label htmlFor="classSubject" style={{ display: 'block', fontSize: 14, fontWeight: 800, color: '#374151', marginBottom: 8 }}>
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 900, color: '#374151', marginBottom: 8 }}>
                   Subject (Optional)
                 </label>
                 <input
-                  type="text"
-                  id="classSubject"
                   value={newClassSubject}
                   onChange={(e) => setNewClassSubject(e.target.value)}
                   placeholder="e.g., Life Sciences"
@@ -468,9 +465,8 @@ function Teacher() {
                     border: '1px solid #E5E7EB',
                     borderRadius: 12,
                     fontSize: 16,
-                    boxSizing: 'border-box',
                     outline: 'none',
-                    transition: 'box-shadow 0.15s, border-color 0.15s'
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
@@ -478,26 +474,27 @@ function Teacher() {
               <div style={{ display: 'flex', gap: 12 }}>
                 <button
                   type="button"
+                  className="btn-secondary"
+                  style={{ flex: 1 }}
                   onClick={() => {
                     setShowCreateModal(false)
                     setNewClassName('')
                     setNewClassSubject('')
                   }}
-                  className="btn-secondary"
-                  style={{ flex: 1 }}
+                  disabled={isCreating}
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  disabled={!newClassName.trim() || isCreating}
                   className="btn-primary"
                   style={{
                     flex: 1,
                     opacity: !newClassName.trim() || isCreating ? 0.55 : 1,
                     cursor: !newClassName.trim() || isCreating ? 'not-allowed' : 'pointer'
                   }}
+                  disabled={!newClassName.trim() || isCreating}
                 >
                   {isCreating ? 'Creating...' : 'Create Class'}
                 </button>
@@ -507,7 +504,7 @@ function Teacher() {
         </div>
       )}
 
-      {/* Upload Modal */}
+      {/* Upload Materials Modal */}
       {showUploadModal && selectedClass && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
@@ -515,19 +512,14 @@ function Teacher() {
           onMouseDown={(e) => {
             if (e.target !== e.currentTarget) return
             setShowUploadModal(false)
-            setMaterials('')
             setSelectedClass(null)
+            setMaterials('')
           }}
         >
           <div
             className="bg-white rounded-lg p-8 max-w-2xl w-full"
+            style={{ margin: 20, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.18)', animation: 'modalIn 140ms ease-out' }}
             onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              margin: 20,
-              borderRadius: 14,
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.18)',
-              animation: 'modalIn 140ms ease-out'
-            }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
               <div>
@@ -537,42 +529,42 @@ function Teacher() {
                 </p>
               </div>
 
-              <button type="button" onClick={handleChooseFile} className="btn-secondary" style={{ whiteSpace: 'nowrap' }}>
-                Add File
+              <button type="button" className="btn-secondary" onClick={handleChooseFile} disabled={isParsingFile}>
+                {isParsingFile ? 'Reading...' : 'Add File'}
               </button>
             </div>
 
-            <form onSubmit={handleUploadMaterials}>
+            <form onSubmit={handleSaveMaterials}>
               <div style={{ marginBottom: 16 }}>
-                <label htmlFor="materials" style={{ display: 'block', fontSize: 14, fontWeight: 800, color: '#374151', marginBottom: 8 }}>
-                  Materials (text)
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 900, color: '#374151', marginBottom: 8 }}>
+                  Materials
                 </label>
+
                 <textarea
-                  id="materials"
-                  ref={uploadModalRef}
+                  ref={uploadTextRef}
                   value={materials}
                   onChange={(e) => setMaterials(e.target.value)}
-                  placeholder="Paste notes, syllabus, key topics... or click Add File"
-                  rows="12"
+                  placeholder="Paste notes… or click Add File (PDF/DOCX/TXT/MD/CSV/JSON)"
+                  rows={12}
                   style={{
                     width: '100%',
                     padding: '12px 16px',
                     border: '1px solid #E5E7EB',
                     borderRadius: 12,
                     fontSize: 14,
+                    outline: 'none',
                     boxSizing: 'border-box',
-                    fontFamily: 'inherit',
-                    resize: 'vertical',
-                    outline: 'none'
+                    resize: 'vertical'
                   }}
                   required
                 />
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, gap: 12, flexWrap: 'wrap' }}>
                   <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>
-                    Tip: keep it concise — the AI uses the most relevant parts automatically.
+                    Tip: the AI automatically uses only the most relevant parts to control tokens.
                   </p>
-                  <p style={{ fontSize: 12, color: '#6B7280', margin: 0, fontWeight: 800 }}>
-                    {Math.min(materials.length, 20000).toLocaleString()} / 20,000
+                  <p style={{ fontSize: 12, color: '#6B7280', margin: 0, fontWeight: 900 }}>
+                    {Math.min(materials.length, UI_LIMITS.MATERIALS_MAX_UI_CHARS).toLocaleString()} / {UI_LIMITS.MATERIALS_MAX_UI_CHARS.toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -580,29 +572,29 @@ function Teacher() {
               <div style={{ display: 'flex', gap: 12 }}>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowUploadModal(false)
-                    setMaterials('')
-                    setSelectedClass(null)
-                  }}
                   className="btn-secondary"
                   style={{ flex: 1 }}
-                  disabled={isUploading}
+                  onClick={() => {
+                    setShowUploadModal(false)
+                    setSelectedClass(null)
+                    setMaterials('')
+                  }}
+                  disabled={isSavingMaterials}
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  disabled={!materials.trim() || isUploading}
                   className="btn-primary"
                   style={{
                     flex: 1,
-                    opacity: !materials.trim() || isUploading ? 0.55 : 1,
-                    cursor: !materials.trim() || isUploading ? 'not-allowed' : 'pointer'
+                    opacity: !materials.trim() || isSavingMaterials ? 0.55 : 1,
+                    cursor: !materials.trim() || isSavingMaterials ? 'not-allowed' : 'pointer'
                   }}
+                  disabled={!materials.trim() || isSavingMaterials}
                 >
-                  {isUploading ? 'Saving...' : 'Save Materials'}
+                  {isSavingMaterials ? 'Saving...' : 'Save Materials'}
                 </button>
               </div>
             </form>
@@ -610,25 +602,21 @@ function Teacher() {
         </div>
       )}
 
-      {/* Delete Modal */}
+      {/* Delete Confirm Modal */}
       {showDeleteModal && classToDelete && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          style={{ backdropFilter: 'blur(2px)' }}
           onMouseDown={(e) => {
             if (e.target !== e.currentTarget) return
             setShowDeleteModal(false)
             setClassToDelete(null)
           }}
-          style={{ backdropFilter: 'blur(2px)' }}
         >
           <div
             className="bg-white rounded-lg p-8 max-w-md w-full"
+            style={{ borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.18)', animation: 'modalIn 140ms ease-out' }}
             onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              borderRadius: 14,
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.18)',
-              animation: 'modalIn 140ms ease-out'
-            }}
           >
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Delete Class?</h2>
             <p style={{ color: '#6B7280', marginBottom: 18, lineHeight: 1.6 }}>
@@ -647,12 +635,12 @@ function Teacher() {
             <div style={{ display: 'flex', gap: 12 }}>
               <button
                 type="button"
+                className="btn-secondary"
+                style={{ flex: 1 }}
                 onClick={() => {
                   setShowDeleteModal(false)
                   setClassToDelete(null)
                 }}
-                className="btn-secondary"
-                style={{ flex: 1 }}
                 disabled={isDeleting}
               >
                 Cancel
@@ -660,7 +648,6 @@ function Teacher() {
 
               <button
                 type="button"
-                onClick={handleDeleteClass}
                 className="btn-primary"
                 style={{
                   flex: 1,
@@ -668,6 +655,7 @@ function Teacher() {
                   opacity: isDeleting ? 0.75 : 1,
                   cursor: isDeleting ? 'not-allowed' : 'pointer'
                 }}
+                onClick={handleConfirmDelete}
                 disabled={isDeleting}
               >
                 {isDeleting ? 'Deleting...' : 'Delete'}

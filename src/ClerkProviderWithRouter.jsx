@@ -6,8 +6,14 @@ export default function ClerkProviderWithRouter({ children }) {
   const navigate = useNavigate();
   const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
-  //if you are using Clerk proxy (clerk.yourdomain.com), set this:
-  const proxyUrl = "https://clerk.mystudyguideai.com";
+  //Only use the Clerk proxy on your real domain. Preview domains (vercel.app) should NOT use it.
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const useProxy =
+    hostname === "mystudyguideai.com" ||
+    hostname === "www.mystudyguideai.com" ||
+    hostname.endsWith(".mystudyguideai.com");
+
+  const proxyUrl = useProxy ? "https://clerk.mystudyguideai.com" : undefined;
 
   if (!publishableKey) {
     return (
@@ -20,7 +26,7 @@ export default function ClerkProviderWithRouter({ children }) {
   return (
     <ClerkProvider
       publishableKey={publishableKey}
-      proxyUrl={proxyUrl}
+      {...(proxyUrl ? { proxyUrl } : {})}
       navigate={(to) => navigate(to)}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"

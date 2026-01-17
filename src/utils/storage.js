@@ -7,9 +7,22 @@
 //
 // For true cross-device persistence, this would need to be replaced with a backend database
 // (e.g., Firebase, Supabase, PostgreSQL) that stores data server-side.
+//
+// Current behavior:
+// - Users must rejoin classes on each new device/browser
+// - Teachers must recreate classes on each new device/browser
+// - Data is tied to the Clerk account but stored per-browser
 
-function normalizeCode(code) {
-  return (code || '').toUpperCase().trim()
+const STORAGE_KEYS = {
+  classes: 'classai_classes',
+  enrollments: 'classai_enrollments'
+}
+
+//Hard caps to prevent token spam + localStorage bloat
+const LIMITS = {
+  MATERIALS_MAX_CHARS: 20000, //stored materials cap (plenty for class notes)
+  CLASS_NAME_MAX: 80,
+  SUBJECT_MAX: 80
 }
 
 // Generate a random class code
@@ -22,40 +35,48 @@ function generateClassCode() {
   return code
 }
 
+function normalizeCode(code) {
+  return (code || '').toUpperCase().trim()
+}
+
+function cleanText(str, maxChars) {
+  const s = (str || '').toString().replace(/\r/g, '').trim()
+  if (!maxChars) return s
+  if (s.length <= maxChars) return s
+  return s.slice(0, maxChars)
+}
+
 // Get all classes from storage
 function getAllClasses() {
-  const classes = localStorage.getItem('classai_classes')
+  const classes = localStorage.getItem(STORAGE_KEYS.classes)
   return classes ? JSON.parse(classes) : {}
 }
 
 // Save all classes to storage
 function saveAllClasses(classes) {
-  localStorage.setItem('classai_classes', JSON.stringify(classes))
+  localStorage.setItem(STORAGE_KEYS.classes, JSON.stringify(classes))
 }
 
 // Get student enrollments from storage
 function getAllEnrollments() {
-  const enrollments = localStorage.getItem('classai_enrollments')
+  const enrollments = localStorage.getItem(STORAGE_KEYS.enrollments)
   return enrollments ? JSON.parse(enrollments) : {}
 }
 
 // Save student enrollments to storage
 function saveAllEnrollments(enrollments) {
-  localStorage.setItem('classai_enrollments', JSON.stringify(enrollments))
+  localStorage.setItem(STORAGE_KEYS.enrollments, JSON.stringify(enrollments))
 }
 
 // Create a new class (teacher only)
 export function createClass(teacherId, className, subject = '') {
   const classes = getAllClasses()
-
-  //Ensure unique code (rare collision)
-  let code = generateClassCode()
-  while (classes[code]) code = generateClassCode()
+  const code = generateClassCode()
 
   const newClass = {
     code,
-    name: className,
-    subject,
+    name: cleanText(className, LIMITS.CLASS_NAME_MAX),
+    subject: cleanText(subject, LIMITS.SUBJECT_MAX),
     teacherId,
     materials: '',
     createdAt: new Date().toISOString()
@@ -86,7 +107,8 @@ export function updateClassMaterials(classCode, materials) {
   const code = normalizeCode(classCode)
 
   if (classes[code]) {
-    classes[code].materials = materials
+    const cleaned = cleanText(materials, LIMITS.MATERIALS_MAX_CHARS)
+    classes[code].materials = cleaned
     classes[code].updatedAt = new Date().toISOString()
     saveAllClasses(classes)
     return true
@@ -127,15 +149,20 @@ export function deleteClass(teacherId, classCode) {
 export function joinClass(studentId, classCode) {
   const classes = getAllClasses()
   const enrollments = getAllEnrollments()
-
   const code = normalizeCode(classCode)
 
   // Check if class exists and has materials
-  if (!classes[code] || !classes[code].materials) return false
+  if (!classes[code] || !(classes[code].materials || '').trim()) {
+    return false
+  }
 
-  if (!enrollments[studentId]) enrollments[studentId] = []
+  if (!enrollments[studentId]) {
+    enrollments[studentId] = []
+  }
 
-  if (enrollments[studentId].some(c => normalizeCode(c) === code)) return false
+  if (enrollments[studentId].map(normalizeCode).includes(code)) {
+    return false
+  }
 
   enrollments[studentId].push(code)
   saveAllEnrollments(enrollments)
@@ -159,6 +186,5 @@ export function getStudentClasses(studentId) {
 export function isStudentEnrolled(studentId, classCode) {
   const enrollments = getAllEnrollments()
   const studentEnrollments = enrollments[studentId] || []
-  const code = normalizeCode(classCode)
-  return studentEnrollments.some(c => normalizeCode(c) === code)
+  return studentEnrollments.map(normalizeCode).includes(normalizeCode(classCode))
 }

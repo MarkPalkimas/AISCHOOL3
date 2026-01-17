@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
-import { createClass, getTeacherClasses, updateClassMaterials } from '../utils/storage'
+import { createClass, getTeacherClasses, updateClassMaterials, deleteClass } from '../utils/storage'
 import { ROLES } from '../utils/roles'
 
 function Teacher() {
@@ -28,6 +28,7 @@ function Teacher() {
   }, [isLoaded, user, role, navigate])
 
   const [classes, setClasses] = useState([])
+
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newClassName, setNewClassName] = useState('')
   const [newClassSubject, setNewClassSubject] = useState('')
@@ -38,10 +39,27 @@ function Teacher() {
   const [materials, setMaterials] = useState('')
   const [isUploading, setIsUploading] = useState(false)
 
-  //Close modals on ESC (clean, modern modal behavior)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [classToDelete, setClassToDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      const teacherClasses = getTeacherClasses(user.id)
+      setClasses(teacherClasses)
+    }
+  }, [user])
+
+  // ESC closes modals
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.key !== 'Escape') return
+
+      if (showDeleteModal) {
+        setShowDeleteModal(false)
+        setClassToDelete(null)
+        return
+      }
 
       if (showUploadModal) {
         setShowUploadModal(false)
@@ -59,38 +77,32 @@ function Teacher() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [showCreateModal, showUploadModal])
+  }, [showCreateModal, showUploadModal, showDeleteModal])
 
-  //Auto-focus the first input when modals open
+  // Autofocus create input
   useEffect(() => {
-    if (showCreateModal) {
-      setTimeout(() => createModalRef.current?.focus(), 0)
-    }
+    if (showCreateModal) setTimeout(() => createModalRef.current?.focus(), 0)
   }, [showCreateModal])
 
+  // Autofocus upload textarea
   useEffect(() => {
-    if (showUploadModal) {
-      setTimeout(() => uploadModalRef.current?.focus(), 0)
-    }
+    if (showUploadModal) setTimeout(() => uploadModalRef.current?.focus(), 0)
   }, [showUploadModal])
 
-  useEffect(() => {
-    if (user) {
-      const teacherClasses = getTeacherClasses(user.id)
-      setClasses(teacherClasses)
-    }
-  }, [user])
+  const refreshClasses = () => {
+    if (!user) return
+    setClasses(getTeacherClasses(user.id))
+  }
 
   const handleCreateClass = async (e) => {
     e.preventDefault()
     if (!newClassName.trim() || !user) return
 
     setIsCreating(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    await new Promise((resolve) => setTimeout(resolve, 400))
 
     const newClass = createClass(user.id, newClassName.trim(), newClassSubject.trim())
-    const updatedClasses = getTeacherClasses(user.id)
-    setClasses(updatedClasses)
+    refreshClasses()
 
     setNewClassName('')
     setNewClassSubject('')
@@ -111,17 +123,35 @@ function Teacher() {
     if (!materials.trim() || !selectedClass || !user) return
 
     setIsUploading(true)
-    await new Promise((resolve) => setTimeout(resolve, 800))
+    await new Promise((resolve) => setTimeout(resolve, 500))
 
-    updateClassMaterials(user.id, selectedClass.code, materials.trim())
-
-    const updatedClasses = getTeacherClasses(user.id)
-    setClasses(updatedClasses)
+    // FIX: storage signature is (classCode, materials)
+    updateClassMaterials(selectedClass.code, materials.trim())
+    refreshClasses()
 
     setShowUploadModal(false)
     setMaterials('')
     setSelectedClass(null)
     setIsUploading(false)
+  }
+
+  const openDeleteModal = (classItem) => {
+    setClassToDelete(classItem)
+    setShowDeleteModal(true)
+  }
+
+  const handleDeleteClass = async () => {
+    if (!user || !classToDelete) return
+
+    setIsDeleting(true)
+    await new Promise((resolve) => setTimeout(resolve, 450))
+
+    deleteClass(user.id, classToDelete.code)
+    refreshClasses()
+
+    setIsDeleting(false)
+    setShowDeleteModal(false)
+    setClassToDelete(null)
   }
 
   return (
@@ -191,6 +221,25 @@ function Teacher() {
                     >
                       {classItem.materials ? 'Active' : 'Setup Needed'}
                     </span>
+
+                    <button
+                      type="button"
+                      onClick={() => openDeleteModal(classItem)}
+                      style={{
+                        padding: '6px 10px',
+                        background: 'white',
+                        border: '1px solid #FCA5A5',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        color: '#B91C1C',
+                        lineHeight: 1,
+                      }}
+                      title="Delete class"
+                    >
+                      Delete
+                    </button>
                   </div>
 
                   <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>{classItem.name}</h3>
@@ -203,16 +252,18 @@ function Teacher() {
                         {classItem.code}
                       </span>
                       <button
+                        type="button"
                         onClick={() => navigator.clipboard.writeText(classItem.code)}
                         style={{
-                          padding: '4px 8px',
+                          padding: '6px 10px',
                           background: 'white',
                           border: '1px solid #D1D5DB',
-                          borderRadius: '4px',
+                          borderRadius: '10px',
                           cursor: 'pointer',
                           fontSize: '12px',
                           color: '#6B7280',
                           whiteSpace: 'nowrap',
+                          fontWeight: '700'
                         }}
                       >
                         Copy
@@ -230,6 +281,7 @@ function Teacher() {
         )}
       </div>
 
+      {/* Create Class Modal */}
       {showCreateModal && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
@@ -247,7 +299,6 @@ function Teacher() {
             style={{
               borderRadius: '14px',
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.18)',
-              transform: 'translateY(0px)',
               animation: 'modalIn 140ms ease-out'
             }}
           >
@@ -271,11 +322,10 @@ function Teacher() {
                     width: '100%',
                     padding: '12px 16px',
                     border: '1px solid #E5E7EB',
-                    borderRadius: '6px',
+                    borderRadius: '10px',
                     fontSize: '16px',
                     boxSizing: 'border-box',
                     outline: 'none',
-                    boxShadow: '0 0 0 0 rgba(59, 130, 246, 0)',
                     transition: 'box-shadow 0.15s, border-color 0.15s'
                   }}
                   onFocus={(e) => {
@@ -284,7 +334,7 @@ function Teacher() {
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = '#E5E7EB'
-                    e.currentTarget.style.boxShadow = '0 0 0 0 rgba(59, 130, 246, 0)'
+                    e.currentTarget.style.boxShadow = 'none'
                   }}
                   required
                 />
@@ -307,11 +357,10 @@ function Teacher() {
                     width: '100%',
                     padding: '12px 16px',
                     border: '1px solid #E5E7EB',
-                    borderRadius: '6px',
+                    borderRadius: '10px',
                     fontSize: '16px',
                     boxSizing: 'border-box',
                     outline: 'none',
-                    boxShadow: '0 0 0 0 rgba(59, 130, 246, 0)',
                     transition: 'box-shadow 0.15s, border-color 0.15s'
                   }}
                   onFocus={(e) => {
@@ -320,7 +369,7 @@ function Teacher() {
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = '#E5E7EB'
-                    e.currentTarget.style.boxShadow = '0 0 0 0 rgba(59, 130, 246, 0)'
+                    e.currentTarget.style.boxShadow = 'none'
                   }}
                 />
               </div>
@@ -356,6 +405,7 @@ function Teacher() {
         </div>
       )}
 
+      {/* Upload Materials Modal */}
       {showUploadModal && selectedClass && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
@@ -401,13 +451,12 @@ function Teacher() {
                     width: '100%',
                     padding: '12px 16px',
                     border: '1px solid #E5E7EB',
-                    borderRadius: '6px',
+                    borderRadius: '10px',
                     fontSize: '14px',
                     boxSizing: 'border-box',
                     fontFamily: 'inherit',
                     resize: 'vertical',
                     outline: 'none',
-                    boxShadow: '0 0 0 0 rgba(59, 130, 246, 0)',
                     transition: 'box-shadow 0.15s, border-color 0.15s'
                   }}
                   onFocus={(e) => {
@@ -416,7 +465,7 @@ function Teacher() {
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = '#E5E7EB'
-                    e.currentTarget.style.boxShadow = '0 0 0 0 rgba(59, 130, 246, 0)'
+                    e.currentTarget.style.boxShadow = 'none'
                   }}
                   required
                 />
@@ -452,6 +501,73 @@ function Teacher() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {showDeleteModal && classToDelete && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onMouseDown={(e) => {
+            if (e.target !== e.currentTarget) return
+            setShowDeleteModal(false)
+            setClassToDelete(null)
+          }}
+          style={{ backdropFilter: 'blur(2px)' }}
+        >
+          <div
+            className="bg-white rounded-lg p-8 max-w-md w-full"
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              borderRadius: '14px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.18)',
+              animation: 'modalIn 140ms ease-out'
+            }}
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Delete Class?</h2>
+            <p style={{ color: '#6B7280', marginBottom: '18px', lineHeight: 1.6 }}>
+              This will permanently delete <strong>{classToDelete.name}</strong> and remove it from all students’ dashboards.
+            </p>
+
+            <div style={{ padding: '12px', background: '#FEF2F2', borderRadius: '12px', border: '1px solid #FECACA', marginBottom: '22px' }}>
+              <div style={{ fontSize: '12px', color: '#991B1B', fontWeight: '800', marginBottom: '4px' }}>
+                This action cannot be undone.
+              </div>
+              <div style={{ fontSize: '12px', color: '#991B1B' }}>
+                Class code: <span style={{ fontFamily: 'monospace', fontWeight: '800' }}>{classToDelete.code}</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setClassToDelete(null)
+                }}
+                className="btn-secondary"
+                style={{ flex: 1 }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteClass}
+                className="btn-primary"
+                style={{
+                  flex: 1,
+                  background: isDeleting ? '#FCA5A5' : '#EF4444',
+                  opacity: isDeleting ? '0.75' : '1',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer'
+                }}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

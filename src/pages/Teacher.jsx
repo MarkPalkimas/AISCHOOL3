@@ -191,4 +191,105 @@ function Teacher() {
                 />
               </div>
 
-              <div style={{ display: 'fl
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false)
+                    setNewClassName('')
+                    setNewClassSubject('')
+                  }}
+                  className="btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newClassName.trim() || isCreating}
+                  className="btn-primary"
+                  style={{
+                    flex: 1,
+                    opacity: (!newClassName.trim() || isCreating) ? '0.5' : '1',
+                    cursor: (!newClassName.trim() || isCreating) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isCreating ? 'Creating...' : 'Create Class'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showUploadModal && selectedClass && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ overflowY: 'auto' }}>
+          <div className="bg-white rounded-lg p-8 max-w-2xl w-full" style={{ margin: '20px' }}>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Class Materials</h2>
+            <p style={{ color: '#6B7280', marginBottom: '24px' }}>
+              {selectedClass.name} - Code: <strong>{selectedClass.code}</strong>
+            </p>
+
+            <form onSubmit={handleUploadMaterials}>
+              <div style={{ marginBottom: '16px' }}>
+                <label htmlFor="materials" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                  Course Materials and Information
+                </label>
+                <textarea
+                  id="materials"
+                  value={materials}
+                  onChange={(e) => setMaterials(e.target.value)}
+                  placeholder="Enter your syllabus, course description, key topics, lecture notes, or any information you want the AI to reference..."
+                  rows="12"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                  required
+                />
+                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>
+                  The AI will use this information to help students understand your course material
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUploadModal(false)
+                    setMaterials('')
+                    setSelectedClass(null)
+                  }}
+                  className="btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!materials.trim() || isUploading}
+                  className="btn-primary"
+                  style={{
+                    flex: 1,
+                    opacity: (!materials.trim() || isUploading) ? '0.5' : '1',
+                    cursor: (!materials.trim() || isUploading) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isUploading ? 'Saving...' : 'Save Materials'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default Teacher

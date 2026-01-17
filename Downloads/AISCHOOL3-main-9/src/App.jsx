@@ -173,7 +173,8 @@ function ProtectedRoute({ children, requireRole }) {
             if (!role && intendedRole && !isAssigningRole) {
                 setIsAssigningRole(true)
                 try {
-                    await user.update({ publicMetadata: { role: intendedRole } })
+                    // Use unsafeMetadata for client-side updates (publicMetadata requires server-side)
+                    await user.update({ unsafeMetadata: { role: intendedRole } })
                     await user.reload()
                     // Clear the state and stay on current page
                     navigate(location.pathname, { replace: true, state: {} })

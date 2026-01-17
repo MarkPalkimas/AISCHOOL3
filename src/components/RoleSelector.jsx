@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useUser } from '@clerk/clerk-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ROLES } from '../utils/roles'
@@ -10,8 +10,29 @@ function RoleSelector() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  const getRole = () => {
+    const pub = user?.publicMetadata?.role
+    const uns = user?.unsafeMetadata?.role
+    return pub || uns || null
+  }
+
   const goAfterRole = (role) => {
-    //Redirect based on which page they were trying to access
+    if (location.state?.from) {
+      const from = location.state.from
+      if (from.startsWith('/teacher')) {
+        if (role === ROLES.TEACHER || role === ROLES.ADMIN) {
+          navigate('/teacher', { replace: true })
+        } else {
+          navigate('/access-denied', { replace: true })
+        }
+        return
+      }
+      if (from.startsWith('/student')) {
+        navigate('/student', { replace: true })
+        return
+      }
+    }
+
     if (location.pathname.includes('/teacher')) {
       if (role === ROLES.TEACHER || role === ROLES.ADMIN) {
         navigate('/teacher', { replace: true })
@@ -26,11 +47,31 @@ function RoleSelector() {
       return
     }
 
-    //Default redirect based on role
     if (role === ROLES.TEACHER || role === ROLES.ADMIN) {
       navigate('/teacher', { replace: true })
     } else {
       navigate('/student', { replace: true })
+    }
+  }
+
+  useEffect(() => {
+    if (!isLoaded || !user) return
+    const role = getRole()
+    if (role) {
+      goAfterRole(role)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, user])
+
+  const setRoleOnServer = async (userId, role) => {
+    const res = await fetch('/api/set-role', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, role }),
+    })
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      throw new Error(`set-role failed (${res.status}): ${txt}`)
     }
   }
 
@@ -43,13 +84,19 @@ function RoleSelector() {
         throw new Error('Clerk not loaded or user missing')
       }
 
-      await user.update({ publicMetadata: { role } })
+      //1)Client-safe: store the role here first
+      await user.update({ unsafeMetadata: { role } })
+
+      //2)Server-only: copy role into publicMetadata (this is what you enforce with)
+      await setRoleOnServer(user.id, role)
+
+      //3)Reload so publicMetadata is available immediately
       await user.reload()
 
       goAfterRole(role)
     } catch (err) {
       console.error(err)
-      setError('Failed to set role. Please try again.')
+      setError('Failed to set role. Make sure /api/set-role is deployed and CLERK_SECRET_KEY is set. Then try again.')
       setIsSubmitting(false)
     }
   }

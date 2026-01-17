@@ -17,13 +17,9 @@ function Teacher() {
       navigate('/sign-in', { replace: true })
       return
     }
-    //only teachers/admin can access teacher portal
     if (role !== ROLES.TEACHER && role !== ROLES.ADMIN) {
-      if (!role) {
-        navigate('/select-role', { replace: true, state: { from: '/teacher' } })
-      } else {
-        navigate('/access-denied', { replace: true })
-      }
+      if (!role) navigate('/select-role', { replace: true, state: { from: '/teacher' } })
+      else navigate('/access-denied', { replace: true })
       return
     }
   }, [isLoaded, user, role, navigate])
@@ -51,7 +47,7 @@ function Teacher() {
     if (!newClassName.trim() || !user) return
 
     setIsCreating(true)
-    await new Promise(resolve => setTimeout(resolve, 500))
+    await new Promise((resolve) => setTimeout(resolve, 500))
 
     const newClass = createClass(user.id, newClassName.trim(), newClassSubject.trim())
     const updatedClasses = getTeacherClasses(user.id)
@@ -62,9 +58,7 @@ function Teacher() {
     setShowCreateModal(false)
     setIsCreating(false)
 
-    if (newClass) {
-      openUploadModal(newClass)
-    }
+    if (newClass) openUploadModal(newClass)
   }
 
   const openUploadModal = (classItem) => {
@@ -78,7 +72,7 @@ function Teacher() {
     if (!materials.trim() || !selectedClass || !user) return
 
     setIsUploading(true)
-    await new Promise(resolve => setTimeout(resolve, 800))
+    await new Promise((resolve) => setTimeout(resolve, 800))
 
     updateClassMaterials(user.id, selectedClass.code, materials.trim())
 
@@ -94,7 +88,16 @@ function Teacher() {
   return (
     <div style={{ minHeight: '100vh', background: 'white' }}>
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div
+          style={{
+            maxWidth: '1200px',
+            margin: '0 auto',
+            padding: '0 24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
             <img src="/Logo.jpg" alt="ClassAI Logo" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
             <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
@@ -104,7 +107,16 @@ function Teacher() {
       </nav>
 
       <div style={{ padding: '40px 24px', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '32px',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
           <div>
             <h1 style={{ fontSize: '32px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>Teacher Dashboard</h1>
             <p style={{ color: '#6B7280' }}>Create classes and upload materials for your AI tutors</p>
@@ -118,7 +130,9 @@ function Teacher() {
         {classes.length === 0 ? (
           <div className="feature-card" style={{ textAlign: 'center', padding: '64px 32px' }}>
             <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '24px' }}>No classes yet</h3>
-            <button onClick={() => setShowCreateModal(true)} className="btn-primary">Create Your First Class</button>
+            <button onClick={() => setShowCreateModal(true)} className="btn-primary">
+              Create Your First Class
+            </button>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
@@ -126,7 +140,16 @@ function Teacher() {
               <div key={classItem.code} className="feature-card" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <span style={{ padding: '4px 12px', background: classItem.materials ? '#DEF7EC' : '#FEF3C7', color: classItem.materials ? '#059669' : '#D97706', borderRadius: '12px', fontSize: '12px', fontWeight: '600' }}>
+                    <span
+                      style={{
+                        padding: '4px 12px',
+                        background: classItem.materials ? '#DEF7EC' : '#FEF3C7',
+                        color: classItem.materials ? '#059669' : '#D97706',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                      }}
+                    >
                       {classItem.materials ? 'Active' : 'Setup Needed'}
                     </span>
                   </div>
@@ -136,11 +159,22 @@ function Teacher() {
 
                   <div style={{ padding: '12px', background: '#F9FAFB', borderRadius: '8px', marginBottom: '16px' }}>
                     <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '6px' }}>Class Code</p>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '18px', fontWeight: '700', color: '#111827', fontFamily: 'monospace' }}>{classItem.code}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                      <span style={{ fontSize: '18px', fontWeight: '700', color: '#111827', fontFamily: 'monospace' }}>
+                        {classItem.code}
+                      </span>
                       <button
-                        onClick={() => { navigator.clipboard.writeText(classItem.code) }}
-                        style={{ padding: '4px 8px', background: 'white', border: '1px solid #D1D5DB', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', color: '#6B7280' }}
+                        onClick={() => navigator.clipboard.writeText(classItem.code)}
+                        style={{
+                          padding: '4px 8px',
+                          background: 'white',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          color: '#6B7280',
+                          whiteSpace: 'nowrap',
+                        }}
                       >
                         Copy
                       </button>
@@ -163,7 +197,10 @@ function Teacher() {
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Class</h2>
             <form onSubmit={handleCreateClass}>
               <div style={{ marginBottom: '20px' }}>
-                <label htmlFor="className" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                <label
+                  htmlFor="className"
+                  style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}
+                >
                   Class Name *
                 </label>
                 <input
@@ -172,13 +209,23 @@ function Teacher() {
                   value={newClassName}
                   onChange={(e) => setNewClassName(e.target.value)}
                   placeholder="e.g., Biology 101"
-                  style={{ width: '100%', padding: '12px 16px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '16px', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box',
+                  }}
                   required
                 />
               </div>
 
               <div style={{ marginBottom: '24px' }}>
-                <label htmlFor="classSubject" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                <label
+                  htmlFor="classSubject"
+                  style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}
+                >
                   Subject (Optional)
                 </label>
                 <input
@@ -187,7 +234,14 @@ function Teacher() {
                   value={newClassSubject}
                   onChange={(e) => setNewClassSubject(e.target.value)}
                   placeholder="e.g., Life Sciences"
-                  style={{ width: '100%', padding: '12px 16px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '16px', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box',
+                  }}
                 />
               </div>
 
@@ -210,8 +264,8 @@ function Teacher() {
                   className="btn-primary"
                   style={{
                     flex: 1,
-                    opacity: (!newClassName.trim() || isCreating) ? '0.5' : '1',
-                    cursor: (!newClassName.trim() || isCreating) ? 'not-allowed' : 'pointer'
+                    opacity: !newClassName.trim() || isCreating ? '0.5' : '1',
+                    cursor: !newClassName.trim() || isCreating ? 'not-allowed' : 'pointer',
                   }}
                 >
                   {isCreating ? 'Creating...' : 'Create Class'}
@@ -232,7 +286,10 @@ function Teacher() {
 
             <form onSubmit={handleUploadMaterials}>
               <div style={{ marginBottom: '16px' }}>
-                <label htmlFor="materials" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                <label
+                  htmlFor="materials"
+                  style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}
+                >
                   Course Materials and Information
                 </label>
                 <textarea
@@ -249,7 +306,7 @@ function Teacher() {
                     fontSize: '14px',
                     boxSizing: 'border-box',
                     fontFamily: 'inherit',
-                    resize: 'vertical'
+                    resize: 'vertical',
                   }}
                   required
                 />
@@ -277,8 +334,8 @@ function Teacher() {
                   className="btn-primary"
                   style={{
                     flex: 1,
-                    opacity: (!materials.trim() || isUploading) ? '0.5' : '1',
-                    cursor: (!materials.trim() || isUploading) ? 'not-allowed' : 'pointer'
+                    opacity: !materials.trim() || isUploading ? '0.5' : '1',
+                    cursor: !materials.trim() || isUploading ? 'not-allowed' : 'pointer',
                   }}
                 >
                   {isUploading ? 'Saving...' : 'Save Materials'}

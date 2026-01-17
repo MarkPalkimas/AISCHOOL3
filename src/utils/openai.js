@@ -2,6 +2,13 @@
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY
 
+const LIMITS = {
+  //Hard cap to prevent token spam
+  MAX_MATERIALS_CHARS_SENT: 6500,
+  MAX_LOCAL_CHUNK_CHARS: 650,
+  MAX_LOCAL_CHUNKS: 6
+}
+
 // System prompt that prevents direct answer-giving and prioritizes teacher materials
 const SYSTEM_PROMPT = `You are an educational AI tutor assistant. Your role is to help students LEARN and UNDERSTAND concepts, not to provide direct answers to their assignments or homework.
 
@@ -24,12 +31,6 @@ B) If the topic is NOT in the course materials:
    Start with: [AI GENERAL KNOWLEDGE]
    Then include this disclaimer: "📚 Note: This topic isn't covered in your teacher's course materials, so I'm using my general knowledge to help you."
    Then provide your helpful response
-
-RESPONSE FORMAT EXAMPLES:
-✓ CORRECT: "[FROM CLASS MATERIALS] According to your class notes on photosynthesis, the process involves..."
-✓ CORRECT: "[AI GENERAL KNOWLEDGE] 📚 Note: This topic isn't covered in your teacher's course materials, so I'm using my general knowledge to help you. Let me explain quantum mechanics..."
-✗ INCORRECT: "Based on the materials..." (missing source tag)
-✗ INCORRECT: Starting response without [FROM CLASS MATERIALS] or [AI GENERAL KNOWLEDGE]
 
 EDUCATIONAL GUIDELINES:
 1. NEVER provide direct answers to homework problems, assignments, or test questions
@@ -74,7 +75,6 @@ function getQueryKeywords(userMessage) {
     keywords.push(w)
   }
 
-  //keep top unique (preserve order)
   const seen = new Set()
   const uniq = []
   for (const k of keywords) {
@@ -86,23 +86,19 @@ function getQueryKeywords(userMessage) {
 }
 
 function splitIntoChunks(courseMaterials) {
-  //split by blank lines first, then fallback to line splitting
   const raw = (courseMaterials || '').trim()
   if (!raw) return []
 
   const paras = raw.split(/\n\s*\n+/g).map(s => s.trim()).filter(Boolean)
   if (paras.length >= 4) return paras
 
-  const lines = raw.split('\n').map(s => s.trim()).filter(Boolean)
-  return lines
+  return raw.split('\n').map(s => s.trim()).filter(Boolean)
 }
 
-function findRelevantMaterialSnippets(userMessage, courseMaterials) {
+function scoreChunks(userMessage, courseMaterials) {
   const keywords = getQueryKeywords(userMessage)
-  if (!keywords.length) return { snippets: [], score: 0 }
-
   const chunks = splitIntoChunks(courseMaterials)
-  if (!chunks.length) return { snippets: [], score: 0 }
+  if (!keywords.length || !chunks.length) return []
 
   const scored = chunks.map((chunk) => {
     const n = normalizeText(chunk)
@@ -111,7 +107,6 @@ function findRelevantMaterialSnippets(userMessage, courseMaterials) {
       if (n.includes(k)) hits += 1
     }
 
-    //light boost if chunk looks like a heading/definition/explanation
     const bonus =
       /definition|example|formula|theorem|rule|step|procedure|concept|overview|lecture|chapter/i.test(chunk)
         ? 0.5
@@ -121,11 +116,34 @@ function findRelevantMaterialSnippets(userMessage, courseMaterials) {
   }).filter(x => x.hits > 0)
 
   scored.sort((a, b) => b.score - a.score)
+  return scored
+}
 
-  const top = scored.slice(0, 4).map(x => x.chunk)
-  const totalScore = scored.slice(0, 4).reduce((acc, x) => acc + x.score, 0)
+function trimChunk(s, maxChars) {
+  const t = (s || '').replace(/\r/g, '').trim()
+  if (t.length <= maxChars) return t
+  return t.slice(0, maxChars) + '…'
+}
 
-  return { snippets: top, score: totalScore }
+function buildFilteredMaterials(userMessage, courseMaterials) {
+  const raw = (courseMaterials || '').trim()
+  if (!raw) return ''
+
+  const scored = scoreChunks(userMessage, raw)
+  if (scored.length === 0) {
+    //Fallback: first part only (prevents sending entire notes)
+    return raw.slice(0, LIMITS.MAX_MATERIALS_CHARS_SENT)
+  }
+
+  const picked = scored
+    .slice(0, LIMITS.MAX_LOCAL_CHUNKS)
+    .map(x => trimChunk(x.chunk, LIMITS.MAX_LOCAL_CHUNK_CHARS))
+
+  let filtered = picked.join('\n\n')
+  if (filtered.length > LIMITS.MAX_MATERIALS_CHARS_SENT) {
+    filtered = filtered.slice(0, LIMITS.MAX_MATERIALS_CHARS_SENT)
+  }
+  return filtered
 }
 
 function looksLikeDirectAnswerRequest(userMessage) {
@@ -140,7 +158,6 @@ function looksLikeDirectAnswerRequest(userMessage) {
     'answer this',
     'final answer'
   ]
-
   const msg = (userMessage || '').toLowerCase()
   return directAnswerKeywords.some(k => msg.includes(k))
 }
@@ -154,22 +171,18 @@ function ensureSourceTag(text, sourceTag) {
     /^\[AI GENERAL KNOWLEDGE\]/i.test(content)
 
   if (hasTag) return content
-
   return (sourceTag === 'class' ? '[FROM CLASS MATERIALS] ' : '[AI GENERAL KNOWLEDGE] ') + content
 }
 
-function buildMaterialsFirstResponse(userMessage, snippets, isDirectAnswer) {
-  //Never dump full materials; just cite small relevant pieces and teach
-  const excerpt = snippets
-    .slice(0, 3)
-    .map((s, i) => `• Excerpt ${i + 1}: ${s}`)
-    .join('\n')
+//Clean materials-first response (no giant excerpts)
+function buildMaterialsFirstResponse(userMessage, hasCoverage, isDirectAnswer) {
+  if (!hasCoverage) return null
 
   if (isDirectAnswer) {
-    return `[FROM CLASS MATERIALS] I can’t give you a direct answer, but I *can* help you get it using your class notes.\n\nHere are the most relevant parts of your teacher’s materials:\n${excerpt}\n\nLet’s work through it:\n1) Which excerpt seems most directly related to your question?\n2) What key term or rule is the excerpt emphasizing?\n3) Try writing 1–2 sentences in your own words summarizing that idea, and I’ll help you refine it.`
+    return `[FROM CLASS MATERIALS] I can’t give a direct answer, but your class materials *do* cover the concept behind this.\n\nLet’s solve it together:\n1) What topic/section is this from in your notes?\n2) What rule/definition does the question rely on?\n3) Try your first step, and I’ll guide you from there.`
   }
 
-  return `[FROM CLASS MATERIALS] Here’s what your teacher’s materials say that connects to your question:\n${excerpt}\n\nNow let’s make sure you understand it:\n- In your own words, what is the main idea in the most relevant excerpt?\n- What part is confusing (a term, a step, or the “why” behind it)?\n- Want a quick practice check: how would you apply that idea to a simple example?`
+  return `[FROM CLASS MATERIALS] Your teacher’s materials cover this topic. I’ll help you understand it and apply it correctly.\n\nQuick check:\n- What part is confusing (definition, steps, or why it works)?\n- What does your material say is the key rule/idea here?\n\nIf you paste the specific line or section you’re looking at, I’ll walk you through it step-by-step.`
 }
 
 export async function sendMessageToAI(userMessage, courseMaterials, conversationHistory = []) {
@@ -180,40 +193,36 @@ export async function sendMessageToAI(userMessage, courseMaterials, conversation
   try {
     const isDirectAnswer = looksLikeDirectAnswerRequest(userMessage)
 
-    //MATERIALS-FIRST: try to answer from course materials locally before calling OpenAI
     const hasMaterials = !!(courseMaterials && courseMaterials.trim().length > 0)
-    if (hasMaterials) {
-      const { snippets, score } = findRelevantMaterialSnippets(userMessage, courseMaterials)
+    const filteredMaterials = hasMaterials ? buildFilteredMaterials(userMessage, courseMaterials) : ''
 
-      //threshold: if we found meaningful overlap, respond using materials without OpenAI call
-      if (snippets.length > 0 && score >= 2) {
-        const localResponse = buildMaterialsFirstResponse(userMessage, snippets, isDirectAnswer)
-        return ensureSourceTag(localResponse, 'class')
+    //Local gate: if we have any meaningful match, answer as "FROM CLASS MATERIALS" without API
+    if (hasMaterials) {
+      const scored = scoreChunks(userMessage, courseMaterials)
+      const hasCoverage = scored.length > 0 && scored[0].hits >= 2
+
+      if (hasCoverage) {
+        const local = buildMaterialsFirstResponse(userMessage, true, isDirectAnswer)
+        return ensureSourceTag(local, 'class')
       }
     }
 
-    //If not covered by materials, use OpenAI (but enforce the tag + disclaimer via system prompt)
+    //Call OpenAI only when materials don't cover it well
     const messages = [
       {
         role: 'system',
-        content: `${SYSTEM_PROMPT}\n\n--- COURSE MATERIALS ---\n${courseMaterials || ''}\n--- END COURSE MATERIALS ---`
+        content: `${SYSTEM_PROMPT}\n\n--- COURSE MATERIALS (FILTERED) ---\n${filteredMaterials}\n--- END COURSE MATERIALS ---`
       }
     ]
 
-    //Add conversation history (limit to last 10 messages to manage token usage)
     const recentHistory = conversationHistory.slice(-10)
     messages.push(...recentHistory.map(msg => ({
       role: msg.role,
       content: msg.content
     })))
 
-    //Add current user message
-    messages.push({
-      role: 'user',
-      content: userMessage
-    })
+    messages.push({ role: 'user', content: userMessage })
 
-    //If clearly asking for direct answer, add an extra system message
     if (isDirectAnswer) {
       messages.push({
         role: 'system',
@@ -241,24 +250,15 @@ export async function sendMessageToAI(userMessage, courseMaterials, conversation
       const errorData = await response.json()
       console.error('OpenAI API Error:', errorData)
 
-      if (response.status === 401) {
-        throw new Error('Invalid OpenAI API key. Please check your configuration.')
-      } else if (response.status === 429) {
-        throw new Error('Rate limit exceeded. Please try again in a moment.')
-      } else {
-        throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
-      }
+      if (response.status === 401) throw new Error('Invalid OpenAI API key. Please check your configuration.')
+      if (response.status === 429) throw new Error('Rate limit exceeded. Please try again in a moment.')
+      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
     }
 
     const data = await response.json()
-    if (!data.choices || data.choices.length === 0) {
-      throw new Error('No response from AI')
-    }
+    const aiText = data?.choices?.[0]?.message?.content || ''
 
-    const aiText = data.choices[0].message.content || ''
-
-    //Hard guarantee the tag exists so your UI badge always works
-    //If we're here, it means materials were not confidently matched -> AI GENERAL KNOWLEDGE
+    //If we reached OpenAI, assume general knowledge response unless it explicitly claims class materials
     const finalText = ensureSourceTag(aiText, 'ai')
     return finalText
 

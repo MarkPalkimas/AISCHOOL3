@@ -45,38 +45,10 @@ function saveAllEnrollments(enrollments) {
   localStorage.setItem('classai_enrollments', JSON.stringify(enrollments))
 }
 
-// Remove deleted/nonexistent classes from enrollments (safety + keeps dashboards clean)
-export function cleanupDeletedClasses() {
-  const classes = getAllClasses()
-  const enrollments = getAllEnrollments()
-
-  let changed = false
-
-  for (const studentId of Object.keys(enrollments)) {
-    const list = enrollments[studentId] || []
-    const filtered = list.filter(code => !!classes[code])
-    if (filtered.length !== list.length) {
-      enrollments[studentId] = filtered
-      changed = true
-    }
-  }
-
-  if (changed) {
-    saveAllEnrollments(enrollments)
-  }
-
-  return changed
-}
-
 // Create a new class (teacher only)
 export function createClass(teacherId, className, subject = '') {
   const classes = getAllClasses()
-  let code = generateClassCode()
-
-  // Ensure uniqueness (very low chance of collision but still)
-  while (classes[code]) {
-    code = generateClassCode()
-  }
+  const code = generateClassCode()
 
   const newClass = {
     code,
@@ -117,33 +89,33 @@ export function updateClassMaterials(classCode, materials) {
   return false
 }
 
-// Teacher deletes a class (and it is automatically removed from all student dashboards)
+// Delete a class (teacher only) AND remove it from all student enrollments
 export function deleteClass(teacherId, classCode) {
+  const code = (classCode || '').toUpperCase()
   const classes = getAllClasses()
-  const target = classes[classCode]
 
+  const target = classes[code]
   if (!target) return false
   if (target.teacherId !== teacherId) return false
 
-  // Delete the class
-  delete classes[classCode]
+  // Remove class record
+  delete classes[code]
   saveAllClasses(classes)
 
-  // Remove from all student enrollments
+  // Remove from every student's enrollments
   const enrollments = getAllEnrollments()
   let changed = false
 
-  for (const studentId of Object.keys(enrollments)) {
+  Object.keys(enrollments).forEach((studentId) => {
     const list = enrollments[studentId] || []
-    if (list.includes(classCode)) {
-      enrollments[studentId] = list.filter(code => code !== classCode)
+    const filtered = list.filter((c) => c !== code)
+    if (filtered.length !== list.length) {
+      enrollments[studentId] = filtered
       changed = true
     }
-  }
+  })
 
-  if (changed) {
-    saveAllEnrollments(enrollments)
-  }
+  if (changed) saveAllEnrollments(enrollments)
 
   return true
 }
@@ -153,8 +125,10 @@ export function joinClass(studentId, classCode) {
   const classes = getAllClasses()
   const enrollments = getAllEnrollments()
 
+  const code = (classCode || '').toUpperCase()
+
   // Check if class exists and has materials
-  if (!classes[classCode] || !classes[classCode].materials) {
+  if (!classes[code] || !classes[code].materials) {
     return false
   }
 
@@ -164,12 +138,12 @@ export function joinClass(studentId, classCode) {
   }
 
   // Check if already enrolled
-  if (enrollments[studentId].includes(classCode)) {
+  if (enrollments[studentId].includes(code)) {
     return false
   }
 
   // Add enrollment
-  enrollments[studentId].push(classCode)
+  enrollments[studentId].push(code)
   saveAllEnrollments(enrollments)
 
   return true
@@ -177,9 +151,6 @@ export function joinClass(studentId, classCode) {
 
 // Get all classes a student is enrolled in
 export function getStudentClasses(studentId) {
-  // Clean up any deleted classes so the dashboard stays pristine
-  cleanupDeletedClasses()
-
   const enrollments = getAllEnrollments()
   const classes = getAllClasses()
 
@@ -194,5 +165,5 @@ export function getStudentClasses(studentId) {
 export function isStudentEnrolled(studentId, classCode) {
   const enrollments = getAllEnrollments()
   const studentEnrollments = enrollments[studentId] || []
-  return studentEnrollments.includes(classCode)
+  return studentEnrollments.includes((classCode || '').toUpperCase())
 }

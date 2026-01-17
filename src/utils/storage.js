@@ -7,11 +7,10 @@
 //
 // For true cross-device persistence, this would need to be replaced with a backend database
 // (e.g., Firebase, Supabase, PostgreSQL) that stores data server-side.
-//
-// Current behavior:
-// - Users must rejoin classes on each new device/browser
-// - Teachers must recreate classes on each new device/browser
-// - Data is tied to the Clerk account but stored per-browser
+
+function normalizeCode(code) {
+  return (code || '').toUpperCase().trim()
+}
 
 // Generate a random class code
 function generateClassCode() {
@@ -48,7 +47,10 @@ function saveAllEnrollments(enrollments) {
 // Create a new class (teacher only)
 export function createClass(teacherId, className, subject = '') {
   const classes = getAllClasses()
-  const code = generateClassCode()
+
+  //Ensure unique code (rare collision)
+  let code = generateClassCode()
+  while (classes[code]) code = generateClassCode()
 
   const newClass = {
     code,
@@ -74,15 +76,18 @@ export function getTeacherClasses(teacherId) {
 // Get a specific class by code
 export function getClassByCode(code) {
   const classes = getAllClasses()
-  return classes[code] || null
+  const c = classes[normalizeCode(code)]
+  return c || null
 }
 
 // Update class materials
 export function updateClassMaterials(classCode, materials) {
   const classes = getAllClasses()
-  if (classes[classCode]) {
-    classes[classCode].materials = materials
-    classes[classCode].updatedAt = new Date().toISOString()
+  const code = normalizeCode(classCode)
+
+  if (classes[code]) {
+    classes[code].materials = materials
+    classes[code].updatedAt = new Date().toISOString()
     saveAllClasses(classes)
     return true
   }
@@ -91,24 +96,22 @@ export function updateClassMaterials(classCode, materials) {
 
 // Delete a class (teacher only) AND remove it from all student enrollments
 export function deleteClass(teacherId, classCode) {
-  const code = (classCode || '').toUpperCase()
+  const code = normalizeCode(classCode)
   const classes = getAllClasses()
 
   const target = classes[code]
   if (!target) return false
   if (target.teacherId !== teacherId) return false
 
-  // Remove class record
   delete classes[code]
   saveAllClasses(classes)
 
-  // Remove from every student's enrollments
   const enrollments = getAllEnrollments()
   let changed = false
 
   Object.keys(enrollments).forEach((studentId) => {
     const list = enrollments[studentId] || []
-    const filtered = list.filter((c) => c !== code)
+    const filtered = list.filter((c) => normalizeCode(c) !== code)
     if (filtered.length !== list.length) {
       enrollments[studentId] = filtered
       changed = true
@@ -125,24 +128,15 @@ export function joinClass(studentId, classCode) {
   const classes = getAllClasses()
   const enrollments = getAllEnrollments()
 
-  const code = (classCode || '').toUpperCase()
+  const code = normalizeCode(classCode)
 
   // Check if class exists and has materials
-  if (!classes[code] || !classes[code].materials) {
-    return false
-  }
+  if (!classes[code] || !classes[code].materials) return false
 
-  // Initialize student's enrollments if needed
-  if (!enrollments[studentId]) {
-    enrollments[studentId] = []
-  }
+  if (!enrollments[studentId]) enrollments[studentId] = []
 
-  // Check if already enrolled
-  if (enrollments[studentId].includes(code)) {
-    return false
-  }
+  if (enrollments[studentId].some(c => normalizeCode(c) === code)) return false
 
-  // Add enrollment
   enrollments[studentId].push(code)
   saveAllEnrollments(enrollments)
 
@@ -157,7 +151,7 @@ export function getStudentClasses(studentId) {
   const studentEnrollments = enrollments[studentId] || []
 
   return studentEnrollments
-    .map(code => classes[code])
+    .map(code => classes[normalizeCode(code)])
     .filter(c => c !== undefined)
 }
 
@@ -165,5 +159,6 @@ export function getStudentClasses(studentId) {
 export function isStudentEnrolled(studentId, classCode) {
   const enrollments = getAllEnrollments()
   const studentEnrollments = enrollments[studentId] || []
-  return studentEnrollments.includes((classCode || '').toUpperCase())
+  const code = normalizeCode(classCode)
+  return studentEnrollments.some(c => normalizeCode(c) === code)
 }

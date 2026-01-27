@@ -13,7 +13,7 @@ export default function ClerkProviderWithRouter({ children }) {
     hostname === "mystudyguideai.com" ||
     hostname === "www.mystudyguideai.com";
 
-  const proxyUrl = useProxy ? "/api/clerk-proxy" : undefined;
+  const proxyUrl = useProxy ? "https://clerk.mystudyguideai.com" : undefined;
 
   if (!publishableKey) {
     return (

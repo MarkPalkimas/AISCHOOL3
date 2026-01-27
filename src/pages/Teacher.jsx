@@ -214,7 +214,7 @@ function Teacher() {
   }
 
   const handleChooseFile = () => {
-    if (isUploading || isProcessingImage || isProcessingDocx) return
+    if (isBusy) return
     fileInputRef.current?.click()
   }
 

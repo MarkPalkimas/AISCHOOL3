@@ -334,116 +334,135 @@ function Teacher() {
       )}
 
       <div style={{ padding: '40px 24px', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32, flexWrap: 'wrap', gap: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40, flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h1 style={{ fontSize: 32, fontWeight: 800, color: '#111827', marginBottom: 8 }}>Teacher Dashboard</h1>
-            <p style={{ color: '#6B7280' }}>Create classes and upload materials for your AI tutors</p>
+            <h1 style={{ fontSize: 36, fontWeight: 800, color: '#111827', marginBottom: 8, letterSpacing: '-0.025em' }}>Dashboard</h1>
+            <p style={{ color: '#6B7280', fontSize: 16 }}>Manage your classes and AI teaching resources</p>
           </div>
 
-          <button onClick={() => setShowCreateModal(true)} className="btn-primary">
-            Create New Class
+          <button onClick={() => setShowCreateModal(true)} className="btn-primary" style={{ padding: '12px 24px', fontSize: 15 }}>
+            <span style={{ marginRight: 8 }}>+</span> Create New Class
           </button>
         </div>
 
         {classes.length === 0 ? (
-          <div className="feature-card" style={{ textAlign: 'center', padding: '64px 32px' }}>
-            <h3 style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 24 }}>No classes yet</h3>
+          <div className="feature-card" style={{ textAlign: 'center', padding: '80px 32px', background: '#F9FAFB', border: '2px dashed #E5E7EB' }}>
+            <h3 style={{ fontSize: 22, fontWeight: 700, color: '#111827', marginBottom: 12 }}>No classes yet</h3>
+            <p style={{ color: '#6B7280', marginBottom: 32, maxWidth: 400, margin: '0 auto 32px' }}>Start by creating your first class. You'll be able to upload materials and invite students.</p>
             <button onClick={() => setShowCreateModal(true)} className="btn-primary">
               Create Your First Class
             </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 32 }}>
             {classes.slice(0, displayLimit).map((classItem) => {
-              const hasMaterials = !!(classItem.materials && classItem.materials.trim().length > 0)
+              const classMats = getClassMaterials(classItem.code)
+              const hasMaterials = classMats.length > 0
 
               return (
-                <div key={classItem.code} className="feature-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                <div key={classItem.code} className="feature-card" style={{ display: 'flex', flexDirection: 'column', padding: 28, transition: 'transform 0.2s, box-shadow 0.2s', border: '1px solid #E5E7EB' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                       <span
                         style={{
                           padding: '4px 12px',
-                          background: hasMaterials ? '#DEF7EC' : '#FEF3C7',
-                          color: hasMaterials ? '#059669' : '#D97706',
+                          background: hasMaterials ? '#ECFDF5' : '#FFF7ED',
+                          color: hasMaterials ? '#059669' : '#C2410C',
                           borderRadius: 999,
                           fontSize: 12,
-                          fontWeight: 800
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.025em'
                         }}
                       >
-                        {hasMaterials ? 'Active' : 'Setup Needed'}
+                        {hasMaterials ? '● Active' : '○ Pending Setup'}
                       </span>
 
                       <button
                         type="button"
                         onClick={() => openDeleteModal(classItem)}
+                        className="btn-secondary"
                         style={{
-                          padding: '6px 10px',
-                          background: 'white',
-                          border: '1px solid #FCA5A5',
-                          borderRadius: 12,
-                          cursor: 'pointer',
-                          fontSize: 12,
-                          fontWeight: 900,
-                          color: '#B91C1C',
-                          lineHeight: 1
+                          padding: '6px 12px',
+                          border: 'none',
+                          background: '#FEF2F2',
+                          color: '#DC2626',
+                          fontSize: 11,
+                          fontWeight: 700
                         }}
                       >
-                        Delete
+                        DELETE
                       </button>
                     </div>
 
-                    <h3 style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 4 }}>{classItem.name}</h3>
+                    <h3 style={{ fontSize: 24, fontWeight: 800, color: '#111827', marginBottom: 6 }}>{classItem.name}</h3>
                     {!!classItem.subject && (
-                      <p style={{ color: '#6B7280', fontSize: 14, marginBottom: 16 }}>{classItem.subject}</p>
+                      <p style={{ color: '#6B7280', fontSize: 15, marginBottom: 20, fontWeight: 500 }}>{classItem.subject}</p>
                     )}
 
-                    <div style={{ padding: 12, background: '#F9FAFB', borderRadius: 12, marginBottom: 16 }}>
-                      <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 6, fontWeight: 700 }}>Class Code</p>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                        <span style={{ fontSize: 18, fontWeight: 900, color: '#111827', fontFamily: 'monospace' }}>
-                          {classItem.code}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(classItem.code)}
-                          style={{
-                            padding: '6px 10px',
-                            background: 'white',
-                            border: '1px solid #D1D5DB',
-                            borderRadius: 12,
-                            cursor: 'pointer',
-                            fontSize: 12,
-                            color: '#374151',
-                            whiteSpace: 'nowrap',
-                            fontWeight: 900
-                          }}
-                        >
-                          Copy
-                        </button>
+                    <div style={{ padding: 16, background: '#F8FAFC', borderRadius: 12, border: '1px solid #F1F5F9', marginBottom: 24 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Join Code</span>
+                        <span style={{ fontSize: 18, fontWeight: 900, color: '#0F172A', fontFamily: 'monospace', letterSpacing: '0.1em' }}>{classItem.code}</span>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(classItem.code)}
+                        className="btn-secondary"
+                        style={{ width: '100%', fontSize: 12, fontWeight: 700, background: 'white' }}
+                      >
+                        Copy Invitation Code
+                      </button>
+                    </div>
+
+                    {/* Material Preview Section */}
+                    <div style={{ marginBottom: 24 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Class Repository</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>{classMats.length} items</span>
+                      </div>
+
+                      {classMats.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {classMats.slice(0, 3).map(m => (
+                            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#F1F5F9', borderRadius: 8 }}>
+                              <span style={{ fontSize: 14 }}>{m.type.includes('pdf') ? '📄' : m.type.includes('sheet') ? '📊' : '📝'}</span>
+                              <span style={{ fontSize: 13, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{m.name}</span>
+                            </div>
+                          ))}
+                          {classMats.length > 3 && (
+                            <button onClick={() => openUploadModal(classItem)} style={{ background: 'none', border: 'none', color: '#3B82F6', fontSize: 12, fontWeight: 600, padding: '4px 0', cursor: 'pointer', textAlign: 'left' }}>
+                              + {classMats.length - 3} more files...
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ padding: '12px', background: '#F9FAFB', borderRadius: 8, border: '1px dashed #E5E7EB', textAlign: 'center', fontSize: 13, color: '#94A3B8' }}>
+                          No materials uploaded yet
+                        </div>
+                      )}
                     </div>
 
                     {/* Class Size Gauge */}
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>Enrolled Students</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#6B7280' }}>
+                    <div style={{ marginBottom: 24, padding: '16px 0', borderTop: '1px solid #F1F5F9' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Enrollment</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#64748B' }}>
                           {getEnrolledCount(classItem.code)} / {classItem.capacity || 30}
                         </span>
                       </div>
-                      <div style={{ height: 8, background: '#F3F4F6', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: 10, background: '#F1F5F9', borderRadius: 5, overflow: 'hidden' }}>
                         <div
                           style={{
                             height: '100%',
                             width: `${Math.min(100, (getEnrolledCount(classItem.code) / (classItem.capacity || 30)) * 100)}%`,
-                            background: (getEnrolledCount(classItem.code) / (classItem.capacity || 30)) >= 0.9 ? '#EF4444' : '#3B82F6',
-                            transition: 'width 0.3s ease'
+                            background: (getEnrolledCount(classItem.code) / (classItem.capacity || 30)) >= 0.9 ? '#F43F5E' : '#3B82F6',
+                            transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                         />
                       </div>
-                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280' }}>Capacity:</label>
+                      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>Set Capacity:</span>
                         <input
                           type="number"
                           defaultValue={classItem.capacity || 30}
@@ -456,20 +475,33 @@ function Teacher() {
                             }
                           }}
                           style={{
-                            width: 50,
-                            fontSize: 11,
-                            padding: '2px 4px',
-                            border: '1px solid #E5E7EB',
-                            borderRadius: 4,
-                            outline: 'none'
+                            width: 60,
+                            fontSize: 12,
+                            padding: '4px 8px',
+                            border: '1px solid #E2E8F0',
+                            borderRadius: 6,
+                            outline: 'none',
+                            fontWeight: 700,
+                            color: '#1E293B'
                           }}
                         />
                       </div>
                     </div>
                   </div>
 
-                  <button onClick={() => openUploadModal(classItem)} className="btn-secondary" style={{ width: '100%' }}>
-                    {hasMaterials ? 'Update Materials' : 'Upload Materials'}
+                  <button
+                    onClick={() => openUploadModal(classItem)}
+                    className="btn-primary"
+                    style={{
+                      width: '100%',
+                      background: 'white',
+                      color: '#3B82F6',
+                      border: '2px solid #3B82F6',
+                      fontWeight: 700,
+                      padding: '12px'
+                    }}
+                  >
+                    Manage Materials
                   </button>
                 </div>
               )
@@ -478,12 +510,13 @@ function Teacher() {
         )}
 
         {classes.length > displayLimit && (
-          <div style={{ textAlign: 'center', marginTop: '32px' }}>
+          <div style={{ textAlign: 'center', marginTop: '48px' }}>
             <button
               onClick={() => setDisplayLimit(prev => prev + 6)}
               className="btn-secondary"
+              style={{ padding: '12px 32px' }}
             >
-              Show More Classes
+              Load More Classes
             </button>
           </div>
         )}

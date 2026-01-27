@@ -4,9 +4,19 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
-import { createClass, getTeacherClasses, updateClassMaterials, deleteClass, updateClassCapacity, getEnrolledCount } from '../utils/storage'
+import {
+  createClass,
+  getTeacherClasses,
+  deleteClass,
+  updateClassCapacity,
+  getEnrolledCount,
+  createMaterial,
+  getClassMaterials,
+  deleteMaterial
+} from '../utils/storage'
 import { ROLES } from '../utils/roles'
 import { ocrImageToNotes } from '../utils/ocr'
+import * as XLSX from 'xlsx'
 
 function Teacher() {
   const { user, isLoaded } = useUser()
@@ -41,12 +51,12 @@ function Teacher() {
 
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [selectedClass, setSelectedClass] = useState(null)
-  const [materials, setMaterials] = useState('')
+  const [classMaterials, setClassMaterials] = useState([])
   const [isUploading, setIsUploading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterType, setFilterType] = useState('all')
 
-  const [isProcessingImage, setIsProcessingImage] = useState(false)
-  const [isProcessingDocx, setIsProcessingDocx] = useState(false)
-  const [isProcessingPPTX, setIsProcessingPPTX] = useState(false)
+  const [activeUploads, setActiveUploads] = useState({}) // track progress per file
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [classToDelete, setClassToDelete] = useState(null)
@@ -132,32 +142,25 @@ function Teacher() {
 
   const openUploadModal = (classItem) => {
     setSelectedClass(classItem)
-    setMaterials(classItem.materials || '')
+    setClassMaterials(getClassMaterials(classItem.code))
     setShowUploadModal(true)
   }
 
-  const handleUploadMaterials = async (e) => {
-    e.preventDefault()
-    if (!selectedClass || !user) return
-    if (!materials.trim()) {
-      showToast('Add some materials first', 'error')
-      return
+  const handleDeleteMaterial = (materialId) => {
+    if (window.confirm('Are you sure you want to delete this material?')) {
+      deleteMaterial(materialId)
+      if (selectedClass) {
+        setClassMaterials(getClassMaterials(selectedClass.code))
+      }
+      showToast('Material deleted')
     }
+  }
 
-    setIsUploading(true)
-    await new Promise((resolve) => setTimeout(resolve, 300))
-
-    updateClassMaterials(selectedClass.code, materials.trim())
-    refreshClasses()
-
-    setShowUploadModal(false)
-    setMaterials('')
-    setSelectedClass(null)
-    setIsUploading(false)
-    setIsProcessingImage(false)
-    setIsProcessingDocx(false)
-
-    showToast('Materials saved')
+  const handleDownloadMaterial = (material) => {
+    // In this SPA with localStorage chunks, we don't have the original file blob safely stored
+    // So we recreate it from the chunks or extracted text if we wanted to.
+    // For now, let's just toast that download is simulated.
+    showToast('Download started (simulated)')
   }
 
   async function copyToClipboard(text) {
@@ -216,179 +219,74 @@ function Teacher() {
   }
 
   const handleFileSelected = async (e) => {
-    const file = e.target.files?.[0]
+    const files = Array.from(e.target.files || [])
     e.target.value = ''
-    if (!file) return
+    if (files.length === 0) return
 
-    const name = (file.name || '').toLowerCase()
+    for (const file of files) {
+      const name = (file.name || '').toLowerCase()
+      const fileId = 'up_' + Math.random().toString(36).substr(2, 5)
 
-    const isImage =
-      file.type === 'image/jpeg' ||
-      file.type === 'image/jpg' ||
-      file.type === 'image/png' ||
-      name.endsWith('.jpg') ||
-      name.endsWith('.jpeg') ||
-      name.endsWith('.png')
-
-    const isDocx =
-      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      name.endsWith('.docx')
-
-    const isPPTX =
-      file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
-      file.type === 'application/vnd.ms-powerpoint' ||
-      name.endsWith('.pptx') ||
-      name.endsWith('.ppt') ||
-      name.endsWith('.pps') ||
-      name.endsWith('.ppsx')
-
-    const allowedText = ['.txt', '.md', '.csv', '.json']
-    const isAllowedText = allowedText.some(ext => name.endsWith(ext))
-
-    //Images: OCR once, store summary into materials
-    if (isImage) {
-      if (file.size > 2 * 1024 * 1024) {
-        showToast('Image too large (max 2MB)', 'error')
-        return
-      }
-
-      setIsProcessingImage(true)
-      showToast('Processing image...', 'success')
+      setActiveUploads(prev => ({ ...prev, [fileId]: { name: file.name, progress: 10, status: 'Processing...' } }))
 
       try {
-        const notes = await ocrImageToNotes(file)
+        let content = ''
+        const isDocx = name.endsWith('.docx')
+        const isImage = /\.(jpg|jpeg|png|webp)$/i.test(name)
+        const isExcel = /\.(xlsx|xls|csv)$/i.test(name)
+        const isJson = name.endsWith('.json')
+        const isPdf = name.endsWith('.pdf')
+        const isText = /\.(txt|md|html|htm)$/i.test(name)
 
-        const block =
-          `--- IMAGE: ${notes.filename || file.name} ---
-${String(notes.summary || '').trim()}
-`.trim()
-
-        setMaterials((prev) => {
-          const base = (prev || '').trim()
-          const next = base ? `${base}\n\n${block}` : block
-          return next.length > 22000 ? next.slice(0, 22000) : next
-        })
-
-        showToast('Image added to materials')
-      } catch (err) {
-        showToast('OCR failed (check OPENAI_API_KEY / deployment)', 'error')
-      } finally {
-        setIsProcessingImage(false)
-      }
-
-      return
-    }
-
-    //DOCX: extract raw text (no tokens)
-    if (isDocx) {
-      if (file.size > 2 * 1024 * 1024) {
-        showToast('DOCX too large (max 2MB)', 'error')
-        return
-      }
-
-      setIsProcessingDocx(true)
-      showToast('Reading DOCX...', 'success')
-
-      try {
-        const buffer = await file.arrayBuffer()
-        const result = await mammoth.extractRawText({ arrayBuffer: buffer })
-        const extracted = String(result?.value || '').replace(/\r/g, '').trim()
-
-        if (!extracted) {
-          showToast('DOCX had no readable text', 'error')
-          return
+        if (isImage) {
+          const notes = await ocrImageToNotes(file)
+          content = notes.summary || 'Image processed (no summary)'
+        } else if (isDocx) {
+          const buffer = await file.arrayBuffer()
+          const result = await mammoth.extractRawText({ arrayBuffer: buffer })
+          content = result?.value || ''
+        } else if (isExcel) {
+          const buffer = await file.arrayBuffer()
+          const workbook = XLSX.read(buffer, { type: 'array' })
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+          content = XLSX.utils.sheet_to_csv(firstSheet)
+        } else if (isJson) {
+          const text = await file.text()
+          content = text
+        } else if (isText || isPdf) {
+          // Note: Simple browser-side PDF text extraction often needs a lib like pdf.js. 
+          // For now, we'll try readAsText or just store as metadata if failed.
+          content = await file.text().catch(() => '(Text extraction not fully supported for this file type yet)')
+        } else {
+          content = `(Uploaded ${file.name}. AI grounding limited for this format.)`
         }
 
-        const block =
-          `--- DOCX: ${file.name} ---
-${extracted}
-`.trim()
-
-        setMaterials((prev) => {
-          const base = (prev || '').trim()
-          const next = base ? `${base}\n\n${block}` : block
-          return next.length > 22000 ? next.slice(0, 22000) : next
+        createMaterial(selectedClass.code, user.id, {
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          content: content.slice(0, 50000)
         })
 
-        showToast('DOCX added to materials')
-      } catch (err) {
-        showToast('Could not read DOCX', 'error')
-      } finally {
-        setIsProcessingDocx(false)
-      }
-
-      return
-    }
-
-    //PPTX/PPS: basic metadata extraction/fallback
-    if (isPPTX) {
-      if (file.size > 5 * 1024 * 1024) {
-        showToast('PPTX too large (max 5MB)', 'error')
-        return
-      }
-
-      setIsProcessingPPTX(true)
-      showToast('Processing PowerPoint...', 'success')
-
-      try {
-        const block =
-          `--- POWERPOINT: ${file.name} ---
-(PowerPoint contents are summarized for AI context. Preview not available yet.)
-`.trim()
-
-        setMaterials((prev) => {
-          const base = (prev || '').trim()
-          const next = base ? `${base}\n\n${block}` : block
-          return next.length > 50000 ? next.slice(0, 50000) : next
+        setActiveUploads(prev => {
+          const next = { ...prev }
+          delete next[fileId]
+          return next
         })
 
-        showToast('PowerPoint metadata added')
+        setClassMaterials(getClassMaterials(selectedClass.code))
+        showToast(`Uploaded ${file.name}`)
       } catch (err) {
-        showToast('Could not process PowerPoint', 'error')
-      } finally {
-        setIsProcessingPPTX(false)
+        console.error(err)
+        setActiveUploads(prev => ({ ...prev, [fileId]: { ...prev[fileId], status: 'Error', error: true } }))
+        showToast(`Failed to upload ${file.name}`, 'error')
       }
-
-      return
     }
-
-    //Text files
-    if (!isAllowedText) {
-      showToast('Only .txt, .md, .csv, .json, .docx, .jpg/.jpeg/.png supported', 'error')
-      return
-    }
-
-    if (file.size > 1024 * 1024) {
-      showToast('File too large (max 1MB)', 'error')
-      return
-    }
-
-    const text = await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result || '')
-      reader.onerror = () => reject(new Error('read failed'))
-      reader.readAsText(file)
-    }).catch(() => null)
-
-    if (!text) {
-      showToast('Could not read file', 'error')
-      return
-    }
-
-    const cleaned = String(text).replace(/\r/g, '').trim()
-    if (!cleaned) {
-      showToast('File was empty', 'error')
-      return
-    }
-
-    setMaterials((prev) => {
-      const base = (prev || '').trim()
-      const next = base ? `${base}\n\n--- FILE: ${file.name} ---\n${cleaned}` : `--- FILE: ${file.name} ---\n${cleaned}`
-      return next.length > 22000 ? next.slice(0, 22000) : next
-    })
-
-    showToast('File added to materials')
   }
+
+  const filteredMaterials = classMaterials
+    .filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter(m => filterType === 'all' || m.type.includes(filterType))
 
   const isBusy = isUploading || isProcessingImage || isProcessingDocx || isProcessingPPTX
 
@@ -591,11 +489,11 @@ ${extracted}
         )}
       </div>
 
-      {/*Hidden file input for materials*/}
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.md,.csv,.json,.docx,.jpg,.jpeg,.png,text/plain,text/markdown,application/json,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png"
+        multiple
+        accept=".txt,.md,.csv,.json,.docx,.xlsx,.xls,.pdf,.jpg,.jpeg,.png,.pptx,.pps"
         style={{ display: 'none' }}
         onChange={handleFileSelected}
       />
@@ -703,7 +601,7 @@ ${extracted}
         </div>
       )}
 
-      {/*Upload Modal*/}
+      {/*Upload Modal (Structured)*/}
       {showUploadModal && selectedClass && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
@@ -711,107 +609,124 @@ ${extracted}
           onMouseDown={(e) => {
             if (e.target !== e.currentTarget) return
             setShowUploadModal(false)
-            setMaterials('')
             setSelectedClass(null)
-            setIsProcessingImage(false)
-            setIsProcessingDocx(false)
           }}
         >
           <div
-            className="bg-white rounded-lg p-8 max-w-2xl w-full"
+            className="bg-white rounded-lg p-8 max-w-4xl w-full"
             onMouseDown={(e) => e.stopPropagation()}
             style={{
               margin: 20,
               borderRadius: 14,
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.18)',
-              animation: 'modalIn 140ms ease-out'
+              animation: 'modalIn 140ms ease-out',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 24 }}>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Class Materials</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Course Materials</h2>
                 <p style={{ color: '#6B7280' }}>
                   {selectedClass.name} — Code: <strong>{selectedClass.code}</strong>
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={handleChooseFile}
-                className="btn-secondary"
-                style={{ whiteSpace: 'nowrap', opacity: isBusy ? 0.6 : 1, cursor: isBusy ? 'not-allowed' : 'pointer' }}
-                disabled={isBusy}
-              >
-                {isProcessingImage ? 'Processing image...' : isProcessingDocx ? 'Reading DOCX...' : isProcessingPPTX ? 'Processing PowerPoint...' : 'Add File'}
-              </button>
-            </div>
-
-            <form onSubmit={handleUploadMaterials}>
-              <div style={{ marginBottom: 16 }}>
-                <label htmlFor="materials" style={{ display: 'block', fontSize: 14, fontWeight: 800, color: '#374151', marginBottom: 8 }}>
-                  Materials (text)
-                </label>
-                <textarea
-                  id="materials"
-                  ref={uploadModalRef}
-                  value={materials}
-                  onChange={(e) => setMaterials(e.target.value)}
-                  placeholder="Paste notes... or click Add File (txt/md/csv/json/docx/jpg/png)"
-                  rows="12"
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: 12,
-                    fontSize: 14,
-                    boxSizing: 'border-box',
-                    fontFamily: 'inherit',
-                    resize: 'vertical',
-                    outline: 'none'
-                  }}
-                  required
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, gap: 12, flexWrap: 'wrap' }}>
-                  <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>
-                    Tip: images get converted into a short summary once to save tokens.
-                  </p>
-                  <p style={{ fontSize: 12, color: '#6B7280', margin: 0, fontWeight: 800 }}>
-                    {Math.min(materials.length, 20000).toLocaleString()} / 20,000
-                  </p>
-                </div>
-              </div>
-
               <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  type="button"
+                  onClick={handleChooseFile}
+                  className="btn-primary"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  Upload Files
+                </button>
                 <button
                   type="button"
                   onClick={() => {
                     setShowUploadModal(false)
-                    setMaterials('')
                     setSelectedClass(null)
-                    setIsProcessingImage(false)
-                    setIsProcessingDocx(false)
                   }}
                   className="btn-secondary"
-                  style={{ flex: 1 }}
-                  disabled={isBusy}
                 >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={!materials.trim() || isBusy}
-                  className="btn-primary"
-                  style={{
-                    flex: 1,
-                    opacity: (!materials.trim() || isBusy) ? 0.55 : 1,
-                    cursor: (!materials.trim() || isBusy) ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {isUploading ? 'Saving...' : 'Save Materials'}
+                  Close
                 </button>
               </div>
-            </form>
+            </div>
+
+            <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="Search materials..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #E5E7EB', outline: 'none' }}
+                />
+              </div>
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                style={{ padding: '10px', borderRadius: 8, border: '1px solid #E5E7EB', outline: 'none' }}
+              >
+                <option value="all">All Types</option>
+                <option value="pdf">PDF</option>
+                <option value="word">Word</option>
+                <option value="sheet">Spreadsheets</option>
+                <option value="image">Images</option>
+                <option value="text">Text/Notes</option>
+              </select>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 300, paddingRight: 8 }}>
+              {/* Active Uploads */}
+              {Object.values(activeUploads).map((up, i) => (
+                <div key={i} style={{ padding: 16, border: '1px dashed #3B82F6', borderRadius: 12, background: '#EFF6FF', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="spinner-small" />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{up.name}</div>
+                      <div style={{ fontSize: 12, color: '#3B82F6' }}>{up.status}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {filteredMaterials.length === 0 && Object.keys(activeUploads).length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '64px 0', color: '#9CA3AF' }}>
+                  <p>No materials uploaded yet.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+                  {filteredMaterials.map(m => (
+                    <div key={m.id} className="feature-card" style={{ padding: 16, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
+                        <div style={{ width: 40, height: 40, background: '#F3F4F6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {m.type.includes('pdf') ? '📄' : m.type.includes('sheet') ? '📊' : m.type.includes('word') ? '📝' : m.type.includes('image') ? '🖼️' : '📄'}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h4 style={{ fontSize: 14, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={m.name}>
+                            {m.name}
+                          </h4>
+                          <p style={{ fontSize: 11, color: '#6B7280', margin: '4px 0' }}>
+                            {(m.size / 1024).toFixed(1)} KB • {new Date(m.uploadedAt).toLocaleDateString()}
+                          </p>
+                          <span style={{ fontSize: 10, background: '#DEF7EC', color: '#059669', padding: '2px 6px', borderRadius: 4, fontWeight: 800 }}>
+                            READY
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+                        <button onClick={() => showToast('Preview feature coming soon')} className="btn-secondary" style={{ flex: 1, padding: '6px', fontSize: 11 }}>View</button>
+                        <button onClick={() => handleDownloadMaterial(m)} className="btn-secondary" style={{ flex: 1, padding: '6px', fontSize: 11 }}>Download</button>
+                        <button onClick={() => handleDeleteMaterial(m.id)} className="btn-secondary" style={{ padding: '6px', fontSize: 11, color: '#EF4444', borderColor: '#FCA5A5' }}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

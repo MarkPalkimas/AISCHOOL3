@@ -1,9 +1,9 @@
 // OpenAI API integration for AI chat functionality
+import { getRelevantChunks } from './storage'
 
 const LIMITS = {
   //Hard cap to prevent token spam, but increased for better context
   MAX_MATERIALS_CHARS_SENT: 15000,
-  MAX_LOCAL_CHUNK_CHARS: 1500,
   MAX_LOCAL_CHUNKS: 10
 }
 
@@ -41,9 +41,11 @@ EDUCATIONAL GUIDELINES:
 8. Always be encouraging and supportive
 9. Use Socratic questioning to develop critical thinking
 
-REMEMBER: Every response MUST start with either [FROM CLASS MATERIALS] or [AI GENERAL KNOWLEDGE]. This is non-negotiable.
+You have access to the following relevant snippets from course materials. You should reference them and CITE the material name if available (e.g. "[Name of File]"). 
 
-You have access to the following course materials that you should reference when helping students:`
+Relevant Snippets:
+{context_placeholder}
+--- END Snippets ---`
 
 function normalizeText(str) {
   return (str || '')
@@ -123,25 +125,14 @@ function trimChunk(s, maxChars) {
   return t.slice(0, maxChars) + '…'
 }
 
-function buildFilteredMaterials(userMessage, courseMaterials) {
-  const raw = (courseMaterials || '').trim()
-  if (!raw) return ''
+function buildFilteredMaterials(userMessage, classCode) {
+  const chunks = getRelevantChunks(userMessage, classCode)
+  if (chunks.length === 0) return ''
 
-  const scored = scoreChunks(userMessage, raw)
-  if (scored.length === 0) {
-    //Fallback: first part only (prevents sending entire notes)
-    return raw.slice(0, LIMITS.MAX_MATERIALS_CHARS_SENT)
-  }
-
-  const picked = scored
-    .slice(0, LIMITS.MAX_LOCAL_CHUNKS)
-    .map(x => trimChunk(x.chunk, LIMITS.MAX_LOCAL_CHUNK_CHARS))
-
-  let filtered = picked.join('\n\n')
-  if (filtered.length > LIMITS.MAX_MATERIALS_CHARS_SENT) {
-    filtered = filtered.slice(0, LIMITS.MAX_MATERIALS_CHARS_SENT)
-  }
-  return filtered
+  const context = chunks.map(c => `[Snippet from: ${c.materialName || 'Course Notes'}]\n${c.text}`).join('\n\n')
+  return context.length > LIMITS.MAX_MATERIALS_CHARS_SENT
+    ? context.slice(0, LIMITS.MAX_MATERIALS_CHARS_SENT)
+    : context
 }
 
 function looksLikeDirectAnswerRequest(userMessage) {
@@ -183,15 +174,15 @@ function buildMaterialsFirstResponse(userMessage, hasCoverage, isDirectAnswer) {
   return `[FROM CLASS MATERIALS] Your teacher’s materials cover this topic. I’ll help you understand it and apply it correctly.\n\nQuick check:\n- What part is confusing (definition, steps, or why it works)?\n- What does your material say is the key rule/idea here?\n\nIf you paste the specific line or section you’re looking at, I’ll walk you through it step-by-step.`
 }
 
-export async function sendMessageToAI(userMessage, courseMaterials, conversationHistory = []) {
+export async function sendMessageToAI(userMessage, classCode, conversationHistory = []) {
   try {
-    const hasMaterials = !!(courseMaterials && courseMaterials.trim().length > 0)
-    const filteredMaterials = hasMaterials ? buildFilteredMaterials(userMessage, courseMaterials) : ''
+    const filteredMaterials = buildFilteredMaterials(userMessage, classCode)
+    const promptWithContext = SYSTEM_PROMPT.replace('{context_placeholder}', filteredMaterials || '(No snippets found for this query)')
 
     const messages = [
       {
         role: 'system',
-        content: `${SYSTEM_PROMPT}\n\n--- COURSE MATERIALS (FILTERED) ---\n${filteredMaterials}\n--- END COURSE MATERIALS ---`
+        content: promptWithContext
       }
     ]
 
@@ -238,18 +229,16 @@ export async function sendMessageToAI(userMessage, courseMaterials, conversation
     const data = await response.json()
     const aiText = data?.choices?.[0]?.message?.content || ''
 
-    // Determine if the AI actually used the notes based on its response or matched keywords
-    const scored = hasMaterials ? scoreChunks(userMessage, courseMaterials) : []
-    const hasNoteCoverage = scored.length > 0 && scored[0].hits >= 2
+    // Determine signal using chunks count
+    const chunks = getRelevantChunks(userMessage, classCode)
+    const hasNoteCoverage = chunks.length > 0
 
-    // Default to 'ai' tag unless we are confident it's from class or AI tagged it itself
     let finalSourceTag = 'ai'
     if (hasNoteCoverage || /^\[FROM CLASS MATERIALS\]/i.test(aiText)) {
       finalSourceTag = 'class'
     }
 
-    const finalText = ensureSourceTag(aiText, finalSourceTag)
-    return finalText
+    return ensureSourceTag(aiText, finalSourceTag)
 
   } catch (error) {
     console.error('Error calling OpenAI API:', error)

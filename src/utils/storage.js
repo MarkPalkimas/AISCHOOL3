@@ -15,15 +15,20 @@
 
 const STORAGE_KEYS = {
   classes: 'classai_classes',
-  enrollments: 'classai_enrollments'
+  enrollments: 'classai_enrollments',
+  materials: 'classai_materials', // Structured file metadata
+  chunks: 'classai_chunks'       // Extracted text chunks for AI
 }
 
 //Hard caps to prevent token spam + localStorage bloat
 const LIMITS = {
-  MATERIALS_MAX_CHARS: 50000, // increased for larger notes
+  MATERIALS_MAX_CHARS: 50000,
   CLASS_NAME_MAX: 80,
   SUBJECT_MAX: 80,
-  DEFAULT_CAPACITY: 30
+  DEFAULT_CAPACITY: 30,
+  CHUNK_SIZE: 1000,
+  CHUNK_OVERLAP: 150,
+  MAX_FILE_SIZE_MB: 25
 }
 
 // Generate a random class code
@@ -69,6 +74,24 @@ function saveAllEnrollments(enrollments) {
   localStorage.setItem(STORAGE_KEYS.enrollments, JSON.stringify(enrollments))
 }
 
+function getAllClassMaterials() {
+  const m = localStorage.getItem(STORAGE_KEYS.materials)
+  return m ? JSON.parse(m) : {}
+}
+
+function saveAllClassMaterials(materials) {
+  localStorage.setItem(STORAGE_KEYS.materials, JSON.stringify(materials))
+}
+
+function getAllChunks() {
+  const c = localStorage.getItem(STORAGE_KEYS.chunks)
+  return c ? JSON.parse(c) : {}
+}
+
+function saveAllChunks(chunks) {
+  localStorage.setItem(STORAGE_KEYS.chunks, JSON.stringify(chunks))
+}
+
 // Create a new class (teacher only)
 export function createClass(teacherId, className, subject = '') {
   const classes = getAllClasses()
@@ -100,7 +123,24 @@ export function getTeacherClasses(teacherId) {
 export function getClassByCode(code) {
   const classes = getAllClasses()
   const c = classes[normalizeCode(code)]
-  return c || null
+  if (!c) return null
+
+  // Migration: If class has old 'materials' string, move it to Material/Chunk model
+  if (typeof c.materials === 'string' && c.materials.trim().length > 0) {
+    const legacyText = c.materials
+    c.materials = [] // Clear old field (will be used for IDs list in future or just removed)
+    saveAllClasses(classes)
+
+    // Create a legacy material record
+    createMaterial(c.code, 'teacher', {
+      name: 'Legacy Class Notes',
+      type: 'text/plain',
+      size: legacyText.length,
+      content: legacyText
+    })
+  }
+
+  return c
 }
 
 // Update class materials
@@ -145,6 +185,125 @@ export function getEnrolledCount(classCode) {
   })
 
   return count
+}
+
+// Material Management
+export function createMaterial(classCode, teacherId, file) {
+  const materials = getAllClassMaterials()
+  const id = 'mat_' + Math.random().toString(36).substr(2, 9)
+
+  const newMaterial = {
+    id,
+    classCode: normalizeCode(classCode),
+    teacherId,
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    uploadedAt: new Date().toISOString(),
+    status: 'ready', // ready, error, processing
+    textLength: (file.content || '').length
+  }
+
+  materials[id] = newMaterial
+  saveAllClassMaterials(materials)
+
+  if (file.content) {
+    processTextToChunks(classCode, id, file.name, file.content)
+  }
+
+  return newMaterial
+}
+
+export function getClassMaterials(classCode) {
+  const materials = getAllClassMaterials()
+  const normalized = normalizeCode(classCode)
+  return Object.values(materials)
+    .filter(m => m.classCode === normalized)
+    .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
+}
+
+export function deleteMaterial(materialId) {
+  const materials = getAllClassMaterials()
+  const chunks = getAllChunks()
+
+  delete materials[materialId]
+  saveAllClassMaterials(materials)
+
+  // Clean up chunks
+  const newChunks = {}
+  Object.keys(chunks).forEach(cid => {
+    if (chunks[cid].materialId !== materialId) {
+      newChunks[cid] = chunks[cid]
+    }
+  })
+  saveAllChunks(newChunks)
+
+  return true
+}
+
+// Chunking Logic
+function processTextToChunks(classCode, materialId, materialName, text) {
+  const chunks = getAllChunks()
+  const normalizedCode = normalizeCode(classCode)
+
+  // Standard chunking with overlap
+  let start = 0
+  let index = 0
+  while (start < text.length) {
+    const end = Math.min(start + LIMITS.CHUNK_SIZE, text.length)
+    let chunkText = text.slice(start, end)
+
+    // If not at end, try to find last newline or space to avoid cutting words
+    if (end < text.length) {
+      const lastSpace = chunkText.lastIndexOf(' ')
+      if (lastSpace > LIMITS.CHUNK_SIZE * 0.8) {
+        chunkText = chunkText.slice(0, lastSpace)
+      }
+    }
+
+    const chunkId = `${materialId}_${index}`
+    chunks[chunkId] = {
+      id: chunkId,
+      materialId,
+      materialName,
+      classCode: normalizedCode,
+      text: chunkText,
+      index,
+      createdAt: new Date().toISOString()
+    }
+
+    start += chunkText.length - LIMITS.CHUNK_OVERLAP
+    if (start < 0) start = 0
+    if (chunkText.length <= LIMITS.CHUNK_OVERLAP) break // Safety
+    index++
+  }
+
+  saveAllChunks(chunks)
+}
+
+export function getRelevantChunks(query, classCode) {
+  const allChunks = getAllChunks()
+  const normalizedCode = normalizeCode(classCode)
+  const q = (query || '').toLowerCase()
+
+  const classChunks = Object.values(allChunks).filter(c => c.classCode === normalizedCode)
+
+  // Simple keyword scoring for relevancy
+  const queryWords = q.split(/\s+/).filter(w => w.length > 3)
+
+  if (queryWords.length === 0) return classChunks.slice(0, 8)
+
+  const scored = classChunks.map(chunk => {
+    let score = 0
+    const text = chunk.text.toLowerCase()
+    queryWords.forEach(word => {
+      if (text.includes(word)) score++
+    })
+    return { ...chunk, score }
+  }).filter(c => c.score > 0)
+
+  scored.sort((a, b) => b.score - a.score)
+  return scored.slice(0, 10)
 }
 
 // Delete a class (teacher only) AND remove it from all student enrollments

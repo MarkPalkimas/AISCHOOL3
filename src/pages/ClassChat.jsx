@@ -123,7 +123,7 @@ function ClassChat() {
       }
 
       // Send to OpenAI
-      const response = await sendMessageToAI(messageWithFileContext, classData.materials, newMessages)
+      const response = await sendMessageToAI(messageWithFileContext, classCode, newMessages)
       setMessages([...newMessages, { role: 'assistant', content: response }])
     } catch (error) {
       setMessages([...newMessages, {

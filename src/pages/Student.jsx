@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
-import { getStudentClasses, joinClass, getClassByCode } from '../utils/storage'
+import { getStudentClasses, joinClass, getClassByCode, getClassMaterials } from '../utils/storage'
 import { ROLES } from '../utils/roles'
 
 function Student() {
@@ -13,6 +13,11 @@ function Student() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [displayLimit, setDisplayLimit] = useState(6)
+
+  const [showMaterialsModal, setShowMaterialsModal] = useState(false)
+  const [selectedClass, setSelectedClass] = useState(null)
+  const [classMaterials, setClassMaterials] = useState([])
+  const [searchQuery, setSearchQuery] = useState('')
 
   const role = user?.publicMetadata?.role || user?.unsafeMetadata?.role || null
 
@@ -75,6 +80,16 @@ function Student() {
   const handleClassClick = (classCode) => {
     navigate(`/class/${classCode}`)
   }
+
+  const openMaterialsModal = (classItem) => {
+    setSelectedClass(classItem)
+    setClassMaterials(getClassMaterials(classItem.code))
+    setShowMaterialsModal(true)
+  }
+
+  const filteredMaterials = classMaterials.filter(m =>
+    m.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   return (
     <div style={{ minHeight: '100vh', background: 'white' }}>
@@ -153,11 +168,113 @@ function Student() {
                   <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Class Code</p>
                   <span style={{ fontSize: '16px', fontWeight: '600', color: '#111827', fontFamily: 'monospace' }}>{classItem.code}</span>
                 </div>
-                <div style={{ padding: '12px', background: '#EFF6FF', borderRadius: '8px' }}>
-                  <span style={{ fontSize: '14px', color: '#1E40AF', fontWeight: '500' }}>Click to chat with AI tutor</span>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openMaterialsModal(classItem) }}
+                    className="btn-secondary"
+                    style={{ flex: 1, padding: '8px', fontSize: '12px' }}
+                  >
+                    Materials
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleClassClick(classItem.code) }}
+                    className="btn-primary"
+                    style={{ flex: 1, padding: '8px', fontSize: '12px' }}
+                  >
+                    Chat
+                  </button>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Materials Modal (Read Only) */}
+        {showMaterialsModal && selectedClass && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            style={{ overflowY: 'auto', backdropFilter: 'blur(2px)' }}
+            onMouseDown={(e) => {
+              if (e.target !== e.currentTarget) return
+              setShowMaterialsModal(false)
+              setSelectedClass(null)
+            }}
+          >
+            <div
+              className="bg-white rounded-lg p-8 max-w-4xl w-full"
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                margin: 20,
+                borderRadius: 14,
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.18)',
+                animation: 'modalIn 140ms ease-out',
+                maxHeight: '85vh',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 24 }}>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Class Materials</h2>
+                  <p style={{ color: '#6B7280' }}>
+                    {selectedClass.name} — Resources for AI assistance
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMaterialsModal(false)
+                    setSelectedClass(null)
+                  }}
+                  className="btn-secondary"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <input
+                  type="text"
+                  placeholder="Search materials..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #E5E7EB', outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {filteredMaterials.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '48px 0', color: '#9CA3AF' }}>
+                    No materials found.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+                    {filteredMaterials.map(m => (
+                      <div key={m.id} className="feature-card" style={{ padding: 16, margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 32, height: 32, background: '#F3F4F6', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          📄
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h4 style={{ fontSize: 13, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {m.name}
+                          </h4>
+                          <p style={{ fontSize: 10, color: '#6B7280', margin: '2px 0' }}>
+                            {(m.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 24, padding: 16, background: '#EFF6FF', borderRadius: 12 }}>
+                <p style={{ fontSize: 13, color: '#1E40AF', margin: 0, fontWeight: 500 }}>
+                  💡 These materials are used by your AI tutor to provide accurate, class-specific help.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 

@@ -9,6 +9,10 @@ export default function ClerkProviderWithRouter({ children }) {
   const hostname =
     typeof window !== "undefined" ? window.location.hostname : "";
 
+  const useProxy =
+    hostname === "mystudyguideai.com" ||
+    hostname === "www.mystudyguideai.com";
+
   const domain = useProxy ? "mystudyguideai.com" : undefined;
 
   if (!publishableKey) {

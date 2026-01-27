@@ -9,11 +9,7 @@ export default function ClerkProviderWithRouter({ children }) {
   const hostname =
     typeof window !== "undefined" ? window.location.hostname : "";
 
-  const useProxy =
-    hostname === "mystudyguideai.com" ||
-    hostname === "www.mystudyguideai.com";
-
-  const proxyUrl = useProxy ? "https://clerk.mystudyguideai.com" : undefined;
+  const domain = useProxy ? "mystudyguideai.com" : undefined;
 
   if (!publishableKey) {
     return (
@@ -26,7 +22,8 @@ export default function ClerkProviderWithRouter({ children }) {
   return (
     <ClerkProvider
       publishableKey={publishableKey}
-      proxyUrl={proxyUrl}
+      domain={domain}
+      isSatellite={false}
       navigate={(to) => navigate(to)}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"

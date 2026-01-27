@@ -288,7 +288,7 @@ function Teacher() {
     .filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
     .filter(m => filterType === 'all' || m.type.includes(filterType))
 
-  const isBusy = isUploading || isProcessingImage || isProcessingDocx || isProcessingPPTX
+  const isBusy = isUploading || Object.keys(activeUploads).length > 0
 
   return (
     <div style={{ minHeight: '100vh', background: 'white' }}>

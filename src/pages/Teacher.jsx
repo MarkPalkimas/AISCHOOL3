@@ -265,7 +265,7 @@ function Teacher() {
           name: file.name,
           type: file.type || 'application/octet-stream',
           size: file.size,
-          content: content.slice(0, 50000)
+          content: content.slice(0, 1000000)
         })
 
         setActiveUploads(prev => {

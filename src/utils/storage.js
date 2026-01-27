@@ -22,7 +22,7 @@ const STORAGE_KEYS = {
 
 //Hard caps to prevent token spam + localStorage bloat
 const LIMITS = {
-  MATERIALS_MAX_CHARS: 50000,
+  MATERIALS_MAX_CHARS: 1000000, // Increased to 1 million as requested
   CLASS_NAME_MAX: 80,
   SUBJECT_MAX: 80,
   DEFAULT_CAPACITY: 30,

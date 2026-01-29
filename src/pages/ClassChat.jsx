@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { SignedIn, UserButton, useUser } from '@clerk/clerk-react'
 import { getClassByCode, isStudentEnrolled } from '../utils/storage'
 import { sendMessageToAI } from '../utils/openai'
+import ReactMarkdown from 'react-markdown'
 
 function ClassChat() {
   const { classCode } = useParams()
@@ -192,9 +193,7 @@ function ClassChat() {
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
           {messages.map((message, index) => {
             // Parse AI responses to extract source information
-            const parsedMessage = message.role === 'assistant'
-              ? parseAIResponse(message.content)
-              : { content: message.content }
+            const isAssistant = message.role === 'assistant'
 
             return (
               <div
@@ -202,18 +201,19 @@ function ClassChat() {
                 style={{
                   display: 'flex',
                   justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
-                  marginBottom: '24px'
+                  marginBottom: '32px'
                 }}
               >
                 <div style={{
-                  maxWidth: '85%',
-                  borderRadius: '16px',
+                  maxWidth: '90%',
+                  borderRadius: isAssistant ? '12px 24px 24px 24px' : '24px 24px 4px 24px',
                   background: message.role === 'user' ? '#3B82F6' : 'white',
-                  color: message.role === 'user' ? 'white' : '#111827',
-                  boxShadow: message.role === 'assistant' ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' : 'none',
-                  border: message.role === 'assistant' ? '1px solid #E5E7EB' : 'none'
+                  color: message.role === 'user' ? 'white' : '#1E293B',
+                  boxShadow: isAssistant ? '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02)' : 'none',
+                  border: isAssistant ? '1px solid #F1F5F9' : 'none',
+                  overflow: 'hidden'
                 }}>
-                  {/* The response format will now include [Material], [Code], etc. which we render as pre-wrap text */}
+                  {/* The response format will now include [Phase] headers which we render via ReactMarkdown */}
 
                   {message.files && message.files.length > 0 && (
                     <div style={{ padding: '12px 16px', borderBottom: message.role === 'user' ? '1px solid rgba(255,255,255,0.2)' : '1px solid #E5E7EB' }}>
@@ -253,12 +253,29 @@ function ClassChat() {
                       ))}
                     </div>
                   )}
-                  <div style={{
-                    padding: '12px 16px',
-                    whiteSpace: 'pre-wrap',
-                    lineHeight: '1.6'
-                  }}>
-                    {parsedMessage.content}
+                  <div
+                    className="prose-chat"
+                    style={{
+                      padding: '20px 24px',
+                      lineHeight: '1.7',
+                      fontSize: '15.5px'
+                    }}
+                  >
+                    {isAssistant ? (
+                      <ReactMarkdown
+                        components={{
+                          h3: ({ node, ...props }) => <h3 style={{ fontSize: '14px', fontWeight: 900, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px', marginTop: '16px', borderBottom: '1px solid #F1F5F9', paddingBottom: '4px' }} {...props} />,
+                          p: ({ node, ...props }) => <p style={{ marginBottom: '16px' }} {...props} />,
+                          ul: ({ node, ...props }) => <ul style={{ marginBottom: '16px', paddingLeft: '20px', listStyleType: 'disc' }} {...props} />,
+                          li: ({ node, ...props }) => <li style={{ marginBottom: '8px' }} {...props} />,
+                          strong: ({ node, ...props }) => <strong style={{ color: '#0F172A', fontWeight: 800 }} {...props} />
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    ) : (
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -17,6 +17,10 @@ import {
 import { ROLES } from '../utils/roles'
 import { ocrImageToNotes } from '../utils/ocr'
 import * as XLSX from 'xlsx'
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
 
 function Teacher() {
   const { user, isLoaded } = useUser()
@@ -213,6 +217,29 @@ function Teacher() {
     else showToast('Delete failed', 'error')
   }
 
+  const extractTextFromPdf = async (file) => {
+    try {
+      const buffer = await file.arrayBuffer()
+      const loadingTask = pdfjsLib.getDocument({ data: buffer })
+      const pdf = await loadingTask.promise
+      let fullText = ''
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i)
+        const textContent = await page.getTextContent()
+        const pageText = textContent.items.map(item => item.str).join(' ')
+        fullText += pageText + '\n\n'
+
+        // Safety: truncate if monster PDF
+        if (fullText.length > 800000) break
+      }
+      return fullText
+    } catch (err) {
+      console.error('PDF extraction failed:', err)
+      return null
+    }
+  }
+
   const handleChooseFile = () => {
     if (isBusy) return
     fileInputRef.current?.click()
@@ -245,6 +272,9 @@ function Teacher() {
           const buffer = await file.arrayBuffer()
           const result = await mammoth.extractRawText({ arrayBuffer: buffer })
           content = result?.value || ''
+        } else if (isPdf) {
+          content = await extractTextFromPdf(file)
+          if (!content) content = '(Text extraction failed for this PDF)'
         } else if (isExcel) {
           const buffer = await file.arrayBuffer()
           const workbook = XLSX.read(buffer, { type: 'array' })
@@ -253,10 +283,8 @@ function Teacher() {
         } else if (isJson) {
           const text = await file.text()
           content = text
-        } else if (isText || isPdf) {
-          // Note: Simple browser-side PDF text extraction often needs a lib like pdf.js. 
-          // For now, we'll try readAsText or just store as metadata if failed.
-          content = await file.text().catch(() => '(Text extraction not fully supported for this file type yet)')
+        } else if (isText) {
+          content = await file.text().catch(() => '(Text extraction failed for this file)')
         } else {
           content = `(Uploaded ${file.name}. AI grounding limited for this format.)`
         }

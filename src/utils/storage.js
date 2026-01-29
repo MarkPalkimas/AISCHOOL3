@@ -341,8 +341,9 @@ export function joinClass(studentId, classCode) {
   const enrollments = getAllEnrollments()
   const code = normalizeCode(classCode)
 
-  // Check if class exists and has materials
-  if (!classes[code] || !(classes[code].materials || '').trim()) {
+  // Check if class exists and has materials (new system)
+  const materials = getClassMaterials(code)
+  if (!classes[code] || materials.length === 0) {
     return false
   }
 

@@ -58,7 +58,7 @@ function Student() {
       return
     }
 
-    if (!classData.materials) {
+    if (getClassMaterials(teacherCode.toUpperCase()).length === 0) {
       setError('This class is not yet active. Ask your teacher to upload materials first.')
       setIsLoading(false)
       return

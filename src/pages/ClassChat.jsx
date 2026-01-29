@@ -16,25 +16,11 @@ function ClassChat() {
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  // Helper function to parse AI response and extract source information
+  // Simplistic parsing for the new multi-section format
   const parseAIResponse = (content) => {
-    const classMatRegex = /^\[FROM CLASS MATERIALS\]/i
-    const aiKnowledgeRegex = /^\[AI GENERAL KNOWLEDGE\]/i
-
-    if (classMatRegex.test(content)) {
-      return {
-        source: 'class',
-        content: content.replace(classMatRegex, '').trim()
-      }
-    } else if (aiKnowledgeRegex.test(content)) {
-      return {
-        source: 'ai',
-        content: content.replace(aiKnowledgeRegex, '').trim()
-      }
-    }
-
-    // Default to class if no indicator (backward compatibility)
-    return { source: 'class', content }
+    // The new spec uses [Material], [Code], [AI], [Check]
+    // For now we just return the content as-is to let the AI's internal formatting shine
+    return { content }
   }
 
   useEffect(() => {
@@ -208,7 +194,7 @@ function ClassChat() {
             // Parse AI responses to extract source information
             const parsedMessage = message.role === 'assistant'
               ? parseAIResponse(message.content)
-              : { source: null, content: message.content }
+              : { content: message.content }
 
             return (
               <div
@@ -216,42 +202,18 @@ function ClassChat() {
                 style={{
                   display: 'flex',
                   justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
-                  marginBottom: '16px'
+                  marginBottom: '24px'
                 }}
               >
                 <div style={{
-                  maxWidth: '70%',
-                  borderRadius: '12px',
+                  maxWidth: '85%',
+                  borderRadius: '16px',
                   background: message.role === 'user' ? '#3B82F6' : 'white',
                   color: message.role === 'user' ? 'white' : '#111827',
-                  boxShadow: message.role === 'assistant' ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none'
+                  boxShadow: message.role === 'assistant' ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' : 'none',
+                  border: message.role === 'assistant' ? '1px solid #E5E7EB' : 'none'
                 }}>
-                  {/* Source Badge for AI responses */}
-                  {message.role === 'assistant' && parsedMessage.source && (
-                    <div style={{
-                      padding: '8px 12px',
-                      borderBottom: '1px solid #E5E7EB',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      background: parsedMessage.source === 'class' ? '#ECFDF5' : '#FEF3C7',
-                      borderTopLeftRadius: '12px',
-                      borderTopRightRadius: '12px'
-                    }}>
-                      <span style={{ fontSize: '16px' }}>
-                        {parsedMessage.source === 'class' ? '📚' : '🤖'}
-                      </span>
-                      <span style={{
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: parsedMessage.source === 'class' ? '#059669' : '#D97706'
-                      }}>
-                        {parsedMessage.source === 'class'
-                          ? 'Based on Class Materials'
-                          : 'AI General Knowledge - Not from class notes'}
-                      </span>
-                    </div>
-                  )}
+                  {/* The response format will now include [Material], [Code], etc. which we render as pre-wrap text */}
 
                   {message.files && message.files.length > 0 && (
                     <div style={{ padding: '12px 16px', borderBottom: message.role === 'user' ? '1px solid rgba(255,255,255,0.2)' : '1px solid #E5E7EB' }}>

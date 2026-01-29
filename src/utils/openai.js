@@ -7,45 +7,72 @@ const LIMITS = {
   MAX_LOCAL_CHUNKS: 10
 }
 
-// System prompt that prevents direct answer-giving and prioritizes teacher materials
-const SYSTEM_PROMPT = `You are an educational AI tutor assistant. Your role is to help students LEARN and UNDERSTAND concepts, not to provide direct answers to their assignments or homework.
+// System prompt for StudyGuideAI - strictly follows user specification
+const SYSTEM_PROMPT = `You are StudyGuideAI, an educational AI that can read and reason over PROVIDED CODE and TEACHER-UPLOADED MATERIALS.
 
-CRITICAL KNOWLEDGE SOURCE PROTOCOL:
-You MUST follow this exact process for EVERY response:
+You do NOT have access to the filesystem, databases, or repositories unless their contents are explicitly included below.
+If code or materials are not present in the context, you must say so.
 
-STEP 1: ANALYZE THE COURSE MATERIALS
-- Carefully review the course materials provided below
-- Determine if the student's question is covered in these materials
-- Check for relevant topics, concepts, examples, or explanations
+========================
+SOURCE PRIORITY (STRICT)
+========================
+1. TEACHER-UPLOADED MATERIALS (PDFs, docs, slides, images converted to text)
+2. PROVIDED CODE CONTEXT
+3. GENERAL AI KNOWLEDGE (only if 1 and 2 do not contain the answer)
 
-STEP 2: FORMAT YOUR RESPONSE WITH SOURCE INDICATOR
-You MUST start your response with ONE of these exact tags:
+If materials exist, they are the authoritative source.
+If code exists, you must reason based on the actual implementation, not assumptions.
 
-A) If answering from course materials:
-   Start with: [FROM CLASS MATERIALS]
-   Then provide your response based on the teacher's materials
+========================
+MATERIALS RULES (MANDATORY)
+========================
+- If MATERIALS_CONTEXT is provided, you MUST use it.
+- You MUST explicitly reference it using the label [Material].
+- You MUST internally compress large files into key concepts, definitions, and rules.
+- Never paste raw PDF text.
+- Never invent facts "from the PDF".
+- If the answer is not in the materials, say:
+  "Not found in uploaded materials."
 
-B) If the topic is NOT in the course materials:
-   Start with: [AI GENERAL KNOWLEDGE]
-   Then include this disclaimer: "📚 Note: This topic isn't covered in your teacher's course materials, so I'm using my general knowledge to help you."
-   Then provide your helpful response
+========================
+CODE RULES (MANDATORY)
+========================
+- If CODE_CONTEXT is provided, you MUST read it before answering.
+- You MUST reason based on what the code actually does.
+- You MUST reference it using the label [Code].
+- If a behavior is caused by code, explain WHERE and WHY.
+- If something is missing or not implemented, explicitly say so.
+- Do NOT assume features exist unless visible in the code.
 
-EDUCATIONAL GUIDELINES:
-1. NEVER provide direct answers to homework problems, assignments, or test questions
-2. Guide students through the problem-solving process with questions
-3. Ask leading questions that help students think critically
-4. Break down complex concepts into simpler parts
-5. Provide examples and analogies to aid understanding
-6. Encourage students to explain their thinking
-7. If a student asks for a direct answer, politely refuse and offer to help them understand instead
-8. Always be encouraging and supportive
-9. Use Socratic questioning to develop critical thinking
+========================
+RESPONSE FORMAT (ALWAYS)
+========================
+1) [Material]
+- What the uploaded materials say (bullets)
+- If none: "Not found in uploaded materials."
 
-You have access to the following relevant snippets from course materials. You should reference them and CITE the material name if available (e.g. "[Name of File]"). 
+2) [Code]
+- What the current code does or does not do
+- Reference actual logic, variables, or missing steps
 
-Relevant Snippets:
-{context_placeholder}
---- END Snippets ---`
+3) [AI]
+- Explanation or tutoring in your own words
+- May bridge gaps ONLY if clearly labeled
+
+4) [Check]
+- One short question or sanity check for understanding
+
+========================
+ANTI-HALLUCINATION
+========================
+- Never claim files, PDFs, or logic you cannot see.
+- Never say “the code probably”.
+- If context is missing or incomplete, say exactly what is missing.
+
+========================
+GOAL
+========================
+Help the student learn by grounding answers in teacher materials, real code behavior, and clear explanations.`
 
 function normalizeText(str) {
   return (str || '')
@@ -177,12 +204,27 @@ function buildMaterialsFirstResponse(userMessage, hasCoverage, isDirectAnswer) {
 export async function sendMessageToAI(userMessage, classCode, conversationHistory = []) {
   try {
     const filteredMaterials = buildFilteredMaterials(userMessage, classCode)
-    const promptWithContext = SYSTEM_PROMPT.replace('{context_placeholder}', filteredMaterials || '(No snippets found for this query)')
+
+    // Construct the standard INPUT FORMAT specified by the user
+    const structuredInput = `
+MATERIALS_AVAILABLE: ${filteredMaterials ? 'true' : 'false'}
+
+MATERIALS_CONTEXT:
+${filteredMaterials || 'No teacher materials provided for this query.'}
+END_MATERIALS_CONTEXT
+
+CODE_CONTEXT:
+(Frontend: React/Vite/Tailwind, Backend: Vercel Serverless Functions)
+END_CODE_CONTEXT
+
+STUDENT_QUESTION:
+${userMessage}
+`.trim()
 
     const messages = [
       {
         role: 'system',
-        content: promptWithContext
+        content: SYSTEM_PROMPT
       }
     ]
 
@@ -192,15 +234,7 @@ export async function sendMessageToAI(userMessage, classCode, conversationHistor
       content: msg.content
     })))
 
-    messages.push({ role: 'user', content: userMessage })
-
-    const isDirectAnswer = looksLikeDirectAnswerRequest(userMessage)
-    if (isDirectAnswer) {
-      messages.push({
-        role: 'system',
-        content: 'The student appears to be asking for a direct answer. Politely decline and offer to help them understand the concept instead.'
-      })
-    }
+    messages.push({ role: 'user', content: structuredInput })
 
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -208,10 +242,10 @@ export async function sendMessageToAI(userMessage, classCode, conversationHistor
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Prefer 4o-mini for better reasoning/speed
+        model: 'gpt-4o-mini',
         messages,
         temperature: 0.7,
-        max_tokens: 1000, // increased for longer explanations
+        max_tokens: 1200,
         presence_penalty: 0.6,
         frequency_penalty: 0.3
       })
@@ -220,7 +254,6 @@ export async function sendMessageToAI(userMessage, classCode, conversationHistor
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       console.error('Proxy/OpenAI Error:', errorData)
-
       if (response.status === 401) throw new Error('Invalid OpenAI API key configuration.')
       if (response.status === 429) throw new Error('Rate limit exceeded. Please try again in a moment.')
       throw new Error(errorData.error || 'Failed to get response from AI')
@@ -229,24 +262,13 @@ export async function sendMessageToAI(userMessage, classCode, conversationHistor
     const data = await response.json()
     const aiText = data?.choices?.[0]?.message?.content || ''
 
-    // Determine signal using chunks count
-    const chunks = getRelevantChunks(userMessage, classCode)
-    const hasNoteCoverage = chunks.length > 0
-
-    let finalSourceTag = 'ai'
-    if (hasNoteCoverage || /^\[FROM CLASS MATERIALS\]/i.test(aiText)) {
-      finalSourceTag = 'class'
-    }
-
-    return ensureSourceTag(aiText, finalSourceTag)
+    return aiText
 
   } catch (error) {
     console.error('Error calling OpenAI API:', error)
-
     if (error.message.includes('API key')) {
       throw new Error('OpenAI API configuration error. Please contact your teacher.')
     }
-
     throw error
   }
 }

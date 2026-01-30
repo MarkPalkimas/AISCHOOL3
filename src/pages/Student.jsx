@@ -41,6 +41,18 @@ function Student() {
     }
   }, [user])
 
+  // Body scroll lock when materials modal is open
+  useEffect(() => {
+    if (showMaterialsModal) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [showMaterialsModal])
+
   const handleCodeSubmit = async (e) => {
     e.preventDefault()
     if (!teacherCode.trim() || !user) return

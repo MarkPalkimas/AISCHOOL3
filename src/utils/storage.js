@@ -208,7 +208,8 @@ export function createMaterial(classCode, teacherId, file) {
   saveAllClassMaterials(materials)
 
   if (file.content) {
-    processTextToChunks(classCode, id, file.name, file.content)
+    // Pass pageMetadata if available (for PDFs with page tracking)
+    processTextToChunks(classCode, id, file.name, file.content, file.pageMetadata)
   }
 
   return newMaterial
@@ -242,7 +243,7 @@ export function deleteMaterial(materialId) {
 }
 
 // Chunking Logic
-function processTextToChunks(classCode, materialId, materialName, text) {
+function processTextToChunks(classCode, materialId, materialName, text, pageMetadata = null) {
   const chunks = getAllChunks()
   const normalizedCode = normalizeCode(classCode)
 
@@ -262,7 +263,7 @@ function processTextToChunks(classCode, materialId, materialName, text) {
     }
 
     const chunkId = `${materialId}_${index}`
-    chunks[chunkId] = {
+    const chunk = {
       id: chunkId,
       materialId,
       materialName,
@@ -271,6 +272,21 @@ function processTextToChunks(classCode, materialId, materialName, text) {
       index,
       createdAt: new Date().toISOString()
     }
+
+    // Add page metadata if available (for PDFs)
+    if (pageMetadata && Array.isArray(pageMetadata)) {
+      // Find which page this chunk belongs to based on character position
+      let charCount = 0
+      for (const page of pageMetadata) {
+        if (start >= charCount && start < charCount + page.text.length) {
+          chunk.pageNumber = page.pageNumber
+          break
+        }
+        charCount += page.text.length
+      }
+    }
+
+    chunks[chunkId] = chunk
 
     start += chunkText.length - LIMITS.CHUNK_OVERLAP
     if (start < 0) start = 0
@@ -291,7 +307,11 @@ export function getRelevantChunks(query, classCode) {
   // Simple keyword scoring for relevancy
   const queryWords = q.split(/\s+/).filter(w => w.length > 3)
 
-  if (queryWords.length === 0) return classChunks.slice(0, 8)
+  if (queryWords.length === 0) {
+    // Return up to 10 chunks, respecting 6500 char limit
+    const selected = classChunks.slice(0, 10)
+    return enforceCharLimit(selected, 6500)
+  }
 
   const scored = classChunks.map(chunk => {
     let score = 0
@@ -303,7 +323,36 @@ export function getRelevantChunks(query, classCode) {
   }).filter(c => c.score > 0)
 
   scored.sort((a, b) => b.score - a.score)
-  return scored.slice(0, 10)
+
+  // Return top 10 chunks, respecting 6500 char limit
+  const topChunks = scored.slice(0, 10)
+  return enforceCharLimit(topChunks, 6500)
+}
+
+// Helper to enforce character limit on chunks
+function enforceCharLimit(chunks, maxChars) {
+  const result = []
+  let totalChars = 0
+
+  for (const chunk of chunks) {
+    const chunkLength = chunk.text.length
+    if (totalChars + chunkLength <= maxChars) {
+      result.push(chunk)
+      totalChars += chunkLength
+    } else {
+      // Try to fit a partial chunk if there's room
+      const remaining = maxChars - totalChars
+      if (remaining > 200) {
+        result.push({
+          ...chunk,
+          text: chunk.text.slice(0, remaining) + '...'
+        })
+      }
+      break
+    }
+  }
+
+  return result
 }
 
 // Delete a class (teacher only) AND remove it from all student enrollments

@@ -97,10 +97,7 @@ function Teacher() {
 
       if (showUploadModal) {
         setShowUploadModal(false)
-        setMaterials('')
         setSelectedClass(null)
-        setIsProcessingImage(false)
-        setIsProcessingDocx(false)
         return
       }
 
@@ -113,6 +110,18 @@ function Teacher() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
+  }, [showCreateModal, showUploadModal, showDeleteModal])
+
+  // Body scroll lock when any modal is open
+  useEffect(() => {
+    if (showCreateModal || showUploadModal || showDeleteModal) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
   }, [showCreateModal, showUploadModal, showDeleteModal])
 
   useEffect(() => {
@@ -222,18 +231,26 @@ function Teacher() {
       const buffer = await file.arrayBuffer()
       const loadingTask = pdfjsLib.getDocument({ data: buffer })
       const pdf = await loadingTask.promise
+      const pageMetadata = []
       let fullText = ''
 
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i)
         const textContent = await page.getTextContent()
         const pageText = textContent.items.map(item => item.str).join(' ')
+
+        pageMetadata.push({
+          pageNumber: i,
+          text: pageText
+        })
+
         fullText += pageText + '\n\n'
 
         // Safety: truncate if monster PDF
         if (fullText.length > 800000) break
       }
-      return fullText
+
+      return { text: fullText, pageMetadata }
     } catch (err) {
       console.error('PDF extraction failed:', err)
       return null
@@ -258,6 +275,7 @@ function Teacher() {
 
       try {
         let content = ''
+        let pageMetadata = null
         const isDocx = name.endsWith('.docx')
         const isImage = /\.(jpg|jpeg|png|webp)$/i.test(name)
         const isExcel = /\.(xlsx|xls|csv)$/i.test(name)
@@ -273,8 +291,13 @@ function Teacher() {
           const result = await mammoth.extractRawText({ arrayBuffer: buffer })
           content = result?.value || ''
         } else if (isPdf) {
-          content = await extractTextFromPdf(file)
-          if (!content) content = '(Text extraction failed for this PDF)'
+          const pdfResult = await extractTextFromPdf(file)
+          if (pdfResult) {
+            content = pdfResult.text
+            pageMetadata = pdfResult.pageMetadata
+          } else {
+            content = '(Text extraction failed for this PDF)'
+          }
         } else if (isExcel) {
           const buffer = await file.arrayBuffer()
           const workbook = XLSX.read(buffer, { type: 'array' })
@@ -293,7 +316,8 @@ function Teacher() {
           name: file.name,
           type: file.type || 'application/octet-stream',
           size: file.size,
-          content: content.slice(0, 1000000)
+          content: content.slice(0, 1000000),
+          pageMetadata
         })
 
         setActiveUploads(prev => {

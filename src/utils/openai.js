@@ -2,8 +2,8 @@
 import { getRelevantChunks } from './storage'
 
 const LIMITS = {
-  //Hard cap to prevent token spam, but increased for better context
-  MAX_MATERIALS_CHARS_SENT: 15000,
+  //Hard cap to prevent token spam - enforcing 6500 char limit as requested
+  MAX_MATERIALS_CHARS_SENT: 6500,
   MAX_LOCAL_CHUNKS: 10
 }
 
@@ -32,6 +32,7 @@ Start with a brief conversational greeting or direct address of the question.
 
 [Phase 1] 📚 Materials: Summarize relevant facts/rules from the uploaded notes.
 - If not found, say: "Not explicitly covered in your class materials."
+- IMPORTANT: When citing PDF materials, ALWAYS include page numbers if available (e.g., "According to Biology101.pdf, Page 5...")
 
 [Phase 2] 💻 Code: Explain any technical behavior based on provided code context.
 - If not found, skip this header entirely.
@@ -45,7 +46,8 @@ Start with a brief conversational greeting or direct address of the question.
 ANTI-HALLUCINATION
 ========================
 - Never claim files or logic you cannot see.
-- Cite specific file names in the Materials section (e.g., "[From: Syllabus.pdf]").`
+- Cite specific file names AND page numbers when available (e.g., "[From: Syllabus.pdf, Page 3]").
+- Page numbers help students find the exact source in their materials.`
 
 function normalizeText(str) {
   return (str || '')
@@ -129,9 +131,16 @@ function buildFilteredMaterials(userMessage, classCode) {
   const chunks = getRelevantChunks(userMessage, classCode)
   if (chunks.length === 0) return ''
 
-  const context = chunks.map(c => `[Snippet from: ${c.materialName || 'Course Notes'}]\n${c.text}`).join('\n\n')
+  // Build context with page citations when available
+  const context = chunks.map(c => {
+    const source = c.materialName || 'Course Notes'
+    const pageInfo = c.pageNumber ? `, Page ${c.pageNumber}` : ''
+    return `[Snippet from: ${source}${pageInfo}]\n${c.text}`
+  }).join('\n\n')
+
+  // Hard limit enforced at 6500 chars (getRelevantChunks already does this, but double-check)
   return context.length > LIMITS.MAX_MATERIALS_CHARS_SENT
-    ? context.slice(0, LIMITS.MAX_MATERIALS_CHARS_SENT)
+    ? context.slice(0, LIMITS.MAX_MATERIALS_CHARS_SENT) + '\n[...truncated for token limit]'
     : context
 }
 

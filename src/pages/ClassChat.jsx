@@ -264,7 +264,42 @@ function ClassChat() {
                     {isAssistant ? (
                       <ReactMarkdown
                         components={{
-                          h3: ({ node, ...props }) => <h3 style={{ fontSize: '14px', fontWeight: 900, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px', marginTop: '16px', borderBottom: '1px solid #F1F5F9', paddingBottom: '4px' }} {...props} />,
+                          h3: ({ node, ...props }) => {
+                            // Determine style based on header text content
+                            const text = props.children?.[0] || ''
+                            let bg = '#F1F5F9'
+                            let color = '#475569'
+                            let icon = ''
+
+                            if (text.includes('Materials')) { bg = '#ECFDF5'; color = '#047857'; icon = '📚' }
+                            else if (text.includes('Code')) { bg = '#EFF6FF'; color = '#1D4ED8'; icon = '💻' }
+                            else if (text.includes('AI Tutor')) { bg = '#FAF5FF'; color = '#7E22CE'; icon = '🎓' }
+                            else if (text.includes('Check')) { bg = '#FFF7ED'; color = '#C2410C'; icon = '✅' }
+
+                            return (
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                background: bg,
+                                color: color,
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                marginTop: '20px',
+                                marginBottom: '12px',
+                                border: `1px solid ${bg === '#F1F5F9' ? '#E2E8F0' : 'transparent'}`
+                              }}>
+                                <span style={{ fontSize: '16px' }}>{icon}</span>
+                                <h3 style={{
+                                  fontSize: '13px',
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                  margin: 0
+                                }} {...props} />
+                              </div>
+                            )
+                          },
                           p: ({ node, ...props }) => <p style={{ marginBottom: '16px' }} {...props} />,
                           ul: ({ node, ...props }) => <ul style={{ marginBottom: '16px', paddingLeft: '20px', listStyleType: 'disc' }} {...props} />,
                           li: ({ node, ...props }) => <li style={{ marginBottom: '8px' }} {...props} />,

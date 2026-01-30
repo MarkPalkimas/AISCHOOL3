@@ -226,7 +226,7 @@ function Teacher() {
     else showToast('Delete failed', 'error')
   }
 
-  const extractTextFromPdf = async (file) => {
+  const extractTextFromPdf = async (file, progressCallback) => {
     try {
       const buffer = await file.arrayBuffer()
       const loadingTask = pdfjsLib.getDocument({ data: buffer })
@@ -234,7 +234,16 @@ function Teacher() {
       const pageMetadata = []
       let fullText = ''
 
-      for (let i = 1; i <= pdf.numPages; i++) {
+      const totalPages = pdf.numPages
+      // Limit to 50 pages max for performance
+      const maxPages = Math.min(totalPages, 50)
+
+      for (let i = 1; i <= maxPages; i++) {
+        // Update progress
+        if (progressCallback) {
+          progressCallback(`Processing page ${i} of ${maxPages}...`)
+        }
+
         const page = await pdf.getPage(i)
         const textContent = await page.getTextContent()
         const pageText = textContent.items.map(item => item.str).join(' ')
@@ -246,8 +255,17 @@ function Teacher() {
 
         fullText += pageText + '\n\n'
 
-        // Safety: truncate if monster PDF
-        if (fullText.length > 800000) break
+        // Safety: stop if we have enough content (500KB)
+        if (fullText.length > 500000) {
+          if (progressCallback) {
+            progressCallback(`Extracted ${i} pages (size limit reached)`)
+          }
+          break
+        }
+      }
+
+      if (progressCallback) {
+        progressCallback('Finalizing...')
       }
 
       return { text: fullText, pageMetadata }
@@ -291,7 +309,12 @@ function Teacher() {
           const result = await mammoth.extractRawText({ arrayBuffer: buffer })
           content = result?.value || ''
         } else if (isPdf) {
-          const pdfResult = await extractTextFromPdf(file)
+          // Pass progress callback for PDF extraction
+          const progressCallback = (status) => {
+            setActiveUploads(prev => ({ ...prev, [fileId]: { name: file.name, progress: 50, status } }))
+          }
+
+          const pdfResult = await extractTextFromPdf(file, progressCallback)
           if (pdfResult) {
             content = pdfResult.text
             pageMetadata = pdfResult.pageMetadata

@@ -199,18 +199,15 @@ export async function sendMessageToAI(userMessage, classCode, conversationHistor
   try {
     let filteredMaterials = buildFilteredMaterials(userMessage, classCode)
 
-    //If relevancy returns nothing, but the class has PDF extraction warnings, surface them
-    if (!filteredMaterials) {
-      const pdfWarnings = getPdfWarningsForClass(classCode)
-      if (pdfWarnings.length > 0) {
-        const warningText = pdfWarnings.map(w => {
-          const src = w.materialName || 'PDF'
-          return `[Snippet from: ${src}]\n${w.text}`
-        }).join('\n\n')
+    //Always prepend PDF extraction warnings if they exist
+    const pdfWarnings = getPdfWarningsForClass(classCode)
+    if (pdfWarnings.length > 0) {
+      const warningText = pdfWarnings.map(w => {
+        const src = w.materialName || 'PDF'
+        return `[Snippet from: ${src}]\n${w.text}`
+      }).join('\n\n')
 
-        //Force the AI to return the warning instead of guessing
-        return `⚠️ **PDF Extraction Failed**\n\n${warningText}\n\nUpload a PDF with selectable text OR fix pdf.js worker loading in production.`
-      }
+      filteredMaterials = warningText + (filteredMaterials ? '\n\n' + filteredMaterials : '')
     }
 
     // Check for scanned/empty PDF warning (support WARNING + ERROR)

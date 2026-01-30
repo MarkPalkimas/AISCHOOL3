@@ -18,6 +18,7 @@ import { ROLES } from '../utils/roles'
 import { ocrImageToNotes } from '../utils/ocr'
 import * as XLSX from 'xlsx'
 // Use legacy build for better browser/environment compatibility
+// Use legacy build for better browser/environment compatibility
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 // Helper to ensure worker is always configured before use
@@ -390,6 +391,13 @@ function Teacher() {
           content = pdfResult.text
           pageMetadata = pdfResult.pageMetadata
           console.log('PDF Result Debug:', pdfResult.debug)
+
+          console.log('[PDF_STORE]', {
+            file: file.name,
+            contentLen: (content || '').length,
+            pages: pdfResult?.debug?.pagesDetected,
+            workerSrc: pdfResult?.debug?.workerSrc
+          })
         } else if (isExcel) {
           const buffer = await file.arrayBuffer()
           const workbook = XLSX.read(buffer, { type: 'array' })

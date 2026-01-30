@@ -19,8 +19,11 @@ import { ocrImageToNotes } from '../utils/ocr'
 import * as XLSX from 'xlsx'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+// Use npm package worker instead of CDN for reliability
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  import.meta.url
+).toString()
 
 function Teacher() {
   const { user, isLoaded } = useUser()

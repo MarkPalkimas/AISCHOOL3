@@ -19,11 +19,7 @@ import { ocrImageToNotes } from '../utils/ocr'
 import * as XLSX from 'xlsx'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Use npm package worker instead of CDN for reliability
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).toString()
+// PDF Worker is configured in src/pdfWorkerSetup.js (imported in main.jsx)
 
 function Teacher() {
   const { user, isLoaded } = useUser()
@@ -230,6 +226,17 @@ function Teacher() {
   }
 
   const extractTextFromPdf = async (file, progressCallback) => {
+    const debug = {
+      pagesDetected: 0,
+      extractedTextLength: 0,
+      workerLoaded: !!pdfjsLib.GlobalWorkerOptions.workerSrc,
+      workerSrc: pdfjsLib.GlobalWorkerOptions.workerSrc,
+      first200Chars: '',
+      isLikelyScanned: false
+    }
+
+    console.log('[PDF_PARSE_START]', { fileName: file.name, size: file.size })
+
     try {
       const buffer = await file.arrayBuffer()
       const loadingTask = pdfjsLib.getDocument({ data: buffer })
@@ -238,8 +245,10 @@ function Teacher() {
       let fullText = ''
 
       const totalPages = pdf.numPages
-      // Limit to 50 pages max for performance
-      const maxPages = Math.min(totalPages, 50)
+      debug.pagesDetected = totalPages
+
+      // Limit to 25 pages max for performance/safety
+      const maxPages = Math.min(totalPages, 25)
 
       for (let i = 1; i <= maxPages; i++) {
         // Update progress
@@ -247,16 +256,22 @@ function Teacher() {
           progressCallback(`Processing page ${i} of ${maxPages}...`)
         }
 
-        const page = await pdf.getPage(i)
-        const textContent = await page.getTextContent()
-        const pageText = textContent.items.map(item => item.str).join(' ')
+        try {
+          const page = await pdf.getPage(i)
+          const textContent = await page.getTextContent()
+          const pageText = textContent.items.map(item => item.str).join(' ')
 
-        pageMetadata.push({
-          pageNumber: i,
-          text: pageText
-        })
-
-        fullText += pageText + '\n\n'
+          // Only add non-empty pages
+          if (pageText.trim().length > 0) {
+            pageMetadata.push({
+              pageNumber: i,
+              text: pageText
+            })
+            fullText += pageText + '\n\n'
+          }
+        } catch (pageErr) {
+          console.warn(`Error extracting page ${i}:`, pageErr)
+        }
 
         // Safety: stop if we have enough content (500KB)
         if (fullText.length > 500000) {
@@ -267,14 +282,36 @@ function Teacher() {
         }
       }
 
+      debug.extractedTextLength = fullText.length
+      debug.first200Chars = fullText.slice(0, 200)
+
+      if (fullText.trim().length === 0) {
+        debug.isLikelyScanned = true
+        console.warn('[PDF_PARSE_WARN] No text extracted. Likely scanned PDF.')
+        fullText = `[PDF EXTRACTION WARNING: This PDF appears to be scanned or contains no selectable text. Debug Info: Detected ${totalPages} pages, 0 characters extracted. Please use a PDF with selectable text.]`
+      } else {
+        console.log('[PDF_PARSE_SUCCESS]', {
+          pages: totalPages,
+          extractedChars: fullText.length
+        })
+      }
+
       if (progressCallback) {
         progressCallback('Finalizing...')
       }
 
-      return { text: fullText, pageMetadata }
+      return { text: fullText, pageMetadata, debug }
     } catch (err) {
-      console.error('PDF extraction failed:', err)
-      return null
+      console.error('[PDF_PARSE_FAILURE]', {
+        errorMessage: err.message,
+        stack: err.stack,
+        workerSrc: pdfjsLib.GlobalWorkerOptions.workerSrc
+      })
+      return {
+        text: `[PDF EXTRACTION ERROR: ${err.message}. Please check if the file is valid.]`,
+        pageMetadata: [],
+        debug: { ...debug, error: err.message }
+      }
     }
   }
 
@@ -318,12 +355,10 @@ function Teacher() {
           }
 
           const pdfResult = await extractTextFromPdf(file, progressCallback)
-          if (pdfResult) {
-            content = pdfResult.text
-            pageMetadata = pdfResult.pageMetadata
-          } else {
-            content = '(Text extraction failed for this PDF)'
-          }
+          // Always use results, even if empty/error message is set
+          content = pdfResult.text
+          pageMetadata = pdfResult.pageMetadata
+          console.log('PDF Result Debug:', pdfResult.debug)
         } else if (isExcel) {
           const buffer = await file.arrayBuffer()
           const workbook = XLSX.read(buffer, { type: 'array' })

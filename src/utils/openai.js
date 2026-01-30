@@ -199,6 +199,9 @@ export async function sendMessageToAI(userMessage, classCode, conversationHistor
   try {
     const filteredMaterials = buildFilteredMaterials(userMessage, classCode)
 
+    // Check for scanned/empty PDF warning
+    const pdfExtractionFailed = filteredMaterials.includes('[PDF EXTRACTION WARNING:')
+
     // Construct the standard INPUT FORMAT specified by the user
     const structuredInput = `
 MATERIALS_AVAILABLE: ${filteredMaterials ? 'true' : 'false'}
@@ -206,6 +209,22 @@ MATERIALS_AVAILABLE: ${filteredMaterials ? 'true' : 'false'}
 MATERIALS_CONTEXT:
 ${filteredMaterials || 'No teacher materials provided for this query.'}
 END_MATERIALS_CONTEXT
+
+${pdfExtractionFailed ? `
+CRITICAL SYSTEM INSTRUCTION: 
+A PDF was uploaded but text extraction failed (0 characters extracted, likely scanned).
+DO NOT answer the student's question using general knowledge.
+INSTEAD, reply exactly with:
+"⚠️ **PDF Extraction Failed**
+I see you uploaded a PDF, but I couldn't extract any text from it (0 characters).
+- It might be a scanned image without OCR.
+- It might be empty or corrupted.
+
+**Debug Info:**
+${filteredMaterials.match(/Debug Info: (.*?)\]/)?.[1] || 'Check worker load errors'}
+
+Please upload a PDF with selectable text."
+` : ''}
 
 CODE_CONTEXT:
 (Frontend: React/Vite/Tailwind, Backend: Vercel Serverless Functions)

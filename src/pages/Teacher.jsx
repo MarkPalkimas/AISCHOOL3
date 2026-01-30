@@ -568,15 +568,51 @@ function Teacher() {
 
                       {classMats.length > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {classMats.slice(0, 3).map(m => (
-                            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#F1F5F9', borderRadius: 8 }}>
-                              <span style={{ fontSize: 14 }}>{m.type.includes('pdf') ? '📄' : m.type.includes('sheet') ? '📊' : '📝'}</span>
-                              <span style={{ fontSize: 13, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{m.name}</span>
+                          {classMats.slice(0, 5).map(m => (
+                            <div key={m.id} style={{ padding: '10px', background: '#F8FAFC', borderRadius: 8, border: '1px solid #E2E8F0' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                                  <span style={{ fontSize: 16 }}>
+                                    {m.type.includes('pdf') ? '📄' : m.type.includes('sheet') ? '📊' : m.name.endsWith('docx') ? '📝' : 'ૂ'}
+                                  </span>
+                                  <span style={{ fontSize: 13, fontWeight: 600, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }} title={m.name}>
+                                    {m.name}
+                                  </span>
+                                </div>
+
+                                {/* Status Badge */}
+                                {m.textLength === 0 && !m.name.endsWith('.docx') && !m.type.includes('image') ? (
+                                  <span style={{ fontSize: 10, fontWeight: 700, background: '#FEF2F2', color: '#DC2626', padding: '2px 6px', borderRadius: 4, border: '1px solid #FECACA' }}>
+                                    SCANNED / EMPTY
+                                  </span>
+                                ) : m.status === 'Processing...' ? (
+                                  <span style={{ fontSize: 10, fontWeight: 700, background: '#EFF6FF', color: '#2563EB', padding: '2px 6px', borderRadius: 4 }}>
+                                    PROCESSING
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: 10, fontWeight: 700, background: '#ECFDF5', color: '#059669', padding: '2px 6px', borderRadius: 4 }}>
+                                    READY ({Math.round(m.size / 1024)}KB)
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: 11, color: '#64748B' }}>
+                                  {new Date(m.uploadedAt).toLocaleDateString()}
+                                </span>
+                                <button
+                                  onClick={() => handleDeleteMaterial(m.id)}
+                                  style={{ border: 'none', background: 'none', color: '#94A3B8', cursor: 'pointer', fontSize: 14, padding: 4 }}
+                                  title="Delete file"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
                             </div>
                           ))}
-                          {classMats.length > 3 && (
+                          {classMats.length > 5 && (
                             <button onClick={() => openUploadModal(classItem)} style={{ background: 'none', border: 'none', color: '#3B82F6', fontSize: 12, fontWeight: 600, padding: '4px 0', cursor: 'pointer', textAlign: 'left' }}>
-                              + {classMats.length - 3} more files...
+                              + {classMats.length - 5} more files...
                             </button>
                           )}
                         </div>

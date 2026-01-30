@@ -17,9 +17,25 @@ import {
 import { ROLES } from '../utils/roles'
 import { ocrImageToNotes } from '../utils/ocr'
 import * as XLSX from 'xlsx'
-import * as pdfjsLib from 'pdfjs-dist'
+// Use legacy build for better browser/environment compatibility
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 
-// PDF Worker is configured in src/pdfWorkerSetup.js (imported in main.jsx)
+// Helper to ensure worker is always configured before use
+function ensurePdfWorker() {
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    try {
+      // Try to construct a local URL first - this handles the Vite dev/prod path issues better
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+        'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
+        import.meta.url
+      ).toString()
+    } catch (e) {
+      // Fallback if import.meta.url fails or other issues
+      console.warn('Worker URL construction failed, falling back to CDN as last resort', e)
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+    }
+  }
+}
 
 function Teacher() {
   const { user, isLoaded } = useUser()
@@ -225,7 +241,16 @@ function Teacher() {
     else showToast('Delete failed', 'error')
   }
 
+  // Ensure PDF.js worker is set up
+  const ensurePdfWorker = () => {
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    }
+  };
+
   const extractTextFromPdf = async (file, progressCallback) => {
+    ensurePdfWorker()
+
     const debug = {
       pagesDetected: 0,
       extractedTextLength: 0,
@@ -235,7 +260,7 @@ function Teacher() {
       isLikelyScanned: false
     }
 
-    console.log('[PDF_PARSE_START]', { fileName: file.name, size: file.size })
+    console.log('[PDF_PARSE_START]', { fileName: file.name, size: file.size, workerSrc: debug.workerSrc })
 
     try {
       const buffer = await file.arrayBuffer()
@@ -247,11 +272,9 @@ function Teacher() {
       const totalPages = pdf.numPages
       debug.pagesDetected = totalPages
 
-      // Limit to 25 pages max for performance/safety
       const maxPages = Math.min(totalPages, 25)
 
       for (let i = 1; i <= maxPages; i++) {
-        // Update progress
         if (progressCallback) {
           progressCallback(`Processing page ${i} of ${maxPages}...`)
         }
@@ -259,10 +282,15 @@ function Teacher() {
         try {
           const page = await pdf.getPage(i)
           const textContent = await page.getTextContent()
-          const pageText = textContent.items.map(item => item.str).join(' ')
 
-          // Only add non-empty pages
-          if (pageText.trim().length > 0) {
+          // Safer text joining strategy
+          const pageText = (textContent.items || [])
+            .map(item => (item && typeof item.str === 'string') ? item.str : '')
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+
+          if (pageText.length > 0) {
             pageMetadata.push({
               pageNumber: i,
               text: pageText
@@ -270,10 +298,9 @@ function Teacher() {
             fullText += pageText + '\n\n'
           }
         } catch (pageErr) {
-          console.warn(`Error extracting page ${i}:`, pageErr)
+          console.warn(`[PDF_PAGE_ERROR] page ${i}`, pageErr)
         }
 
-        // Safety: stop if we have enough content (500KB)
         if (fullText.length > 500000) {
           if (progressCallback) {
             progressCallback(`Extracted ${i} pages (size limit reached)`)
@@ -282,13 +309,16 @@ function Teacher() {
         }
       }
 
+      fullText = fullText.replace(/\r/g, '').trim()
+
       debug.extractedTextLength = fullText.length
       debug.first200Chars = fullText.slice(0, 200)
 
-      if (fullText.trim().length === 0) {
+      if (fullText.length === 0) {
         debug.isLikelyScanned = true
-        console.warn('[PDF_PARSE_WARN] No text extracted. Likely scanned PDF.')
-        fullText = `[PDF EXTRACTION WARNING: This PDF appears to be scanned or contains no selectable text. Debug Info: Detected ${totalPages} pages, 0 characters extracted. Please use a PDF with selectable text.]`
+        console.warn('[PDF_PARSE_WARN] 0 characters extracted', debug)
+        fullText = `[PDF EXTRACTION WARNING: 0 characters extracted]\n` +
+          `Debug Info: ${JSON.stringify({ file: file.name, pages: totalPages, workerSrc: debug.workerSrc })}`
       } else {
         console.log('[PDF_PARSE_SUCCESS]', {
           pages: totalPages,
@@ -303,14 +333,15 @@ function Teacher() {
       return { text: fullText, pageMetadata, debug }
     } catch (err) {
       console.error('[PDF_PARSE_FAILURE]', {
-        errorMessage: err.message,
-        stack: err.stack,
+        errorMessage: err?.message,
+        stack: err?.stack,
         workerSrc: pdfjsLib.GlobalWorkerOptions.workerSrc
       })
       return {
-        text: `[PDF EXTRACTION ERROR: ${err.message}. Please check if the file is valid.]`,
+        text: `[PDF EXTRACTION ERROR: ${String(err?.message || err)}]\n` +
+          `Debug Info: ${JSON.stringify({ file: file.name, workerSrc: pdfjsLib.GlobalWorkerOptions.workerSrc })}`,
         pageMetadata: [],
-        debug: { ...debug, error: err.message }
+        debug: { ...debug, error: String(err?.message || err) }
       }
     }
   }

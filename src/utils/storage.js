@@ -297,6 +297,21 @@ function processTextToChunks(classCode, materialId, materialName, text, pageMeta
   saveAllChunks(chunks)
 }
 
+export function getPdfWarningsForClass(classCode) {
+  const allChunks = getAllChunks()
+  const normalizedCode = normalizeCode(classCode)
+
+  const warnings = Object.values(allChunks).filter(c =>
+    c.classCode === normalizedCode &&
+    typeof c.text === 'string' &&
+    (c.text.startsWith('[PDF EXTRACTION WARNING:') || c.text.startsWith('[PDF EXTRACTION ERROR:'))
+  )
+
+  //Return most recent-ish first by createdAt if present
+  warnings.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+  return warnings.slice(0, 3)
+}
+
 export function getRelevantChunks(query, classCode) {
   const allChunks = getAllChunks()
   const normalizedCode = normalizeCode(classCode)

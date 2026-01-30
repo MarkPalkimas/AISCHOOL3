@@ -213,8 +213,10 @@ export async function sendMessageToAI(userMessage, classCode, conversationHistor
       }
     }
 
-    // Check for scanned/empty PDF warning
-    const pdfExtractionFailed = filteredMaterials.includes('[PDF EXTRACTION WARNING:')
+    // Check for scanned/empty PDF warning (support WARNING + ERROR)
+    const pdfExtractionFailed =
+      filteredMaterials.includes('[PDF EXTRACTION WARNING:') ||
+      filteredMaterials.includes('[PDF EXTRACTION ERROR:')
 
     // Construct the standard INPUT FORMAT specified by the user
     const structuredInput = `

@@ -46,7 +46,8 @@ function setLocalJSON(key, value) {
 }
 
 function getAllClasses() {
-  return getLocalJSON(STORAGE_KEYS.classes, memoryStore.classes)
+  const data = getLocalJSON(STORAGE_KEYS.classes, memoryStore.classes)
+  return Array.isArray(data) ? data : []
 }
 
 function setAllClasses(next) {
@@ -54,7 +55,8 @@ function setAllClasses(next) {
 }
 
 function getAllEnrollments() {
-  return getLocalJSON(STORAGE_KEYS.enrollments, memoryStore.enrollments)
+  const data = getLocalJSON(STORAGE_KEYS.enrollments, memoryStore.enrollments)
+  return Array.isArray(data) ? data : []
 }
 
 function setAllEnrollments(next) {

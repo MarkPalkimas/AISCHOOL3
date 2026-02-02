@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useUser } from '@clerk/clerk-react'
+import { useUser, useAuth } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
-import { getStudentClasses, joinClass, getClassByCode, getClassMaterials } from '../utils/storage'
+import { getStudentClasses, joinClass, getClassByCode, getClassMaterials, syncClassMaterials } from '../utils/storage'
 
 function Student() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const navigate = useNavigate()
   const [classes, setClasses] = useState([])
   const [teacherCode, setTeacherCode] = useState('')
@@ -13,10 +14,13 @@ function Student() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (user) {
-      const studentClasses = getStudentClasses(user.id)
-      setClasses(studentClasses)
+    const load = async () => {
+      if (!user) return
+      const token = await getToken()
+      const studentClasses = await getStudentClasses(token)
+      setClasses(studentClasses || [])
     }
+    load()
   }, [user])
 
   const handleCodeSubmit = async (e) => {
@@ -27,8 +31,10 @@ function Student() {
     setError('')
     
     await new Promise(resolve => setTimeout(resolve, 500))
-    
-    const classData = getClassByCode(teacherCode.toUpperCase())
+
+    const token = await getToken()
+    const normalizedCode = teacherCode.toUpperCase()
+    const classData = await getClassByCode(token, normalizedCode)
     
     if (!classData) {
       setError('Invalid class code. Please check the code and try again.')
@@ -36,18 +42,18 @@ function Student() {
       return
     }
 
-    const materials = getClassMaterials(normalizedCode)
+    const materials = await syncClassMaterials(token, normalizedCode)
     if (!materials || materials.length === 0) {
       setError('This class is not yet active. Ask your teacher to upload materials first.')
       setIsLoading(false)
       return
     }
 
-    const success = joinClass(user.id, teacherCode.toUpperCase())
+    const success = await joinClass(token, normalizedCode)
     
     if (success) {
-      const updatedClasses = getStudentClasses(user.id)
-      setClasses(updatedClasses)
+      const updatedClasses = await getStudentClasses(token)
+      setClasses(updatedClasses || [])
       setTeacherCode('')
     } else {
       setError('You are already enrolled in this class.')

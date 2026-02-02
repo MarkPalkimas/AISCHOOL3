@@ -1,4 +1,4 @@
-// Local storage data helpers for ClassAI (client-side)
+// Shared storage helpers for ClassAI (server + local cache)
 
 const LIMITS = {
   CLASS_NAME_MAX: 80,
@@ -8,14 +8,10 @@ const LIMITS = {
 }
 
 const STORAGE_KEYS = {
-  classes: 'classai_classes_v1',
-  enrollments: 'classai_enrollments_v1',
   materials: 'classai_materials_v2'
 }
 
 const memoryStore = {
-  classes: [],
-  enrollments: [],
   materials: []
 }
 
@@ -36,8 +32,6 @@ function getLocalJSON(key, fallback) {
 
 function setLocalJSON(key, value) {
   if (!canUseStorage()) {
-    if (key === STORAGE_KEYS.classes) memoryStore.classes = value
-    if (key === STORAGE_KEYS.enrollments) memoryStore.enrollments = value
     if (key === STORAGE_KEYS.materials) memoryStore.materials = value
     return
   }
@@ -48,20 +42,6 @@ function setLocalJSON(key, value) {
   }
 }
 
-function getAllClasses() {
-  const data = getLocalJSON(STORAGE_KEYS.classes, memoryStore.classes)
-  return Array.isArray(data) ? data : []
-}
-
-function setAllClasses(next) {
-  setLocalJSON(STORAGE_KEYS.classes, next)
-}
-
-function getAllEnrollments() {
-  const data = getLocalJSON(STORAGE_KEYS.enrollments, memoryStore.enrollments)
-  return Array.isArray(data) ? data : []
-}
-
 function getAllMaterials() {
   const data = getLocalJSON(STORAGE_KEYS.materials, memoryStore.materials)
   return Array.isArray(data) ? data : []
@@ -69,10 +49,6 @@ function getAllMaterials() {
 
 function setAllMaterials(next) {
   setLocalJSON(STORAGE_KEYS.materials, next)
-}
-
-function setAllEnrollments(next) {
-  setLocalJSON(STORAGE_KEYS.enrollments, next)
 }
 
 function normalizeCode(code) {
@@ -85,14 +61,157 @@ function cleanText(value, maxLen) {
   return text.length > maxLen ? text.slice(0, maxLen) : text
 }
 
-function generateClassCode() {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let out = ''
-  for (let i = 0; i < 6; i += 1) {
-    out += alphabet[Math.floor(Math.random() * alphabet.length)]
+async function authedFetch(token, url, options = {}) {
+  const headers = {
+    ...(options.headers || {}),
+    'Content-Type': 'application/json'
   }
-  return out
+  if (token) headers.Authorization = `Bearer ${token}`
+  return fetch(url, { ...options, headers })
 }
+
+// ----- SERVER-SIDE CLASS OPERATIONS -----
+
+export async function createClass(token, className, subject = '') {
+  const res = await authedFetch(token, '/api/classes/create', {
+    method: 'POST',
+    body: JSON.stringify({
+      code: generateClassCode(),
+      className: cleanText(className, LIMITS.CLASS_NAME_MAX),
+      subject: cleanText(subject, LIMITS.SUBJECT_MAX)
+    })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'Failed to create class')
+  }
+  return res.json()
+}
+
+export async function getTeacherClasses(token) {
+  const res = await authedFetch(token, '/api/classes/teacher', { method: 'GET' })
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function getClassByCode(token, code) {
+  const normalized = normalizeCode(code)
+  const res = await authedFetch(token, `/api/classes/by-code?code=${encodeURIComponent(normalized)}`, { method: 'GET' })
+  if (!res.ok) return null
+  return res.json()
+}
+
+export async function joinClass(token, classCode) {
+  const code = normalizeCode(classCode)
+  const res = await authedFetch(token, '/api/classes/join', {
+    method: 'POST',
+    body: JSON.stringify({ code })
+  })
+  if (!res.ok) return false
+  return true
+}
+
+export async function getStudentClasses(token) {
+  const res = await authedFetch(token, '/api/classes/student', { method: 'GET' })
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function isStudentEnrolled(token, classCode) {
+  const classes = await getStudentClasses(token)
+  return classes.some(c => c.code === normalizeCode(classCode))
+}
+
+export async function getEnrolledCount(classCode) {
+  const code = normalizeCode(classCode)
+  const res = await fetch(`/api/classes/enrollment?code=${code}`)
+  if (!res.ok) return 0
+  const data = await res.json()
+  return data.count || 0
+}
+
+// ----- MATERIALS: LOCAL CACHE + SERVER SYNC -----
+
+export function createMaterial(classCode, userId, material) {
+  const code = normalizeCode(classCode)
+  const all = getAllMaterials()
+  const item = {
+    id: material?.id || `mat_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+    classCode: code,
+    userId: userId || null,
+    name: material?.name || 'Untitled',
+    type: material?.type || 'application/octet-stream',
+    size: material?.size || 0,
+    content: material?.content || '',
+    pageMetadata: material?.pageMetadata || null,
+    createdAt: new Date().toISOString()
+  }
+  all.push(item)
+  setAllMaterials(all)
+  return item
+}
+
+export function getClassMaterials(classCode) {
+  const code = normalizeCode(classCode)
+  return getAllMaterials().filter(m => normalizeCode(m.classCode) === code)
+}
+
+export function deleteMaterial(materialId) {
+  const all = getAllMaterials()
+  const next = all.filter(m => m.id !== materialId)
+  setAllMaterials(next)
+}
+
+export function upsertClassNotes(classCode, text) {
+  const code = normalizeCode(classCode)
+  const all = getAllMaterials()
+  const id = `notes_${code}`
+  const idx = all.findIndex(m => m.id === id)
+  const item = {
+    id,
+    classCode: code,
+    userId: null,
+    name: 'Teacher Notes',
+    type: 'text/notes',
+    size: text.length,
+    content: text,
+    pageMetadata: null,
+    createdAt: new Date().toISOString()
+  }
+  if (idx >= 0) all[idx] = item
+  else all.push(item)
+  setAllMaterials(all)
+  return true
+}
+
+export async function saveClassMaterials(token, classCode) {
+  const code = normalizeCode(classCode)
+  const materials = getClassMaterials(code)
+  const res = await authedFetch(token, '/api/classes/materials', {
+    method: 'POST',
+    body: JSON.stringify({ code, materials })
+  })
+  return res.ok
+}
+
+export async function syncClassMaterials(token, classCode) {
+  const code = normalizeCode(classCode)
+  const res = await authedFetch(token, `/api/classes/materials?code=${encodeURIComponent(code)}`, { method: 'GET' })
+  if (!res.ok) return []
+  const data = await res.json()
+  const materials = Array.isArray(data?.materials) ? data.materials : []
+  const all = getAllMaterials().filter(m => normalizeCode(m.classCode) !== code)
+  setAllMaterials([...all, ...materials])
+  return materials
+}
+
+export function updateClassMaterials(classCode, materials) {
+  const text = String(materials || '').trim()
+  if (!text) return false
+  return upsertClassNotes(classCode, text)
+}
+
+// ----- MATERIAL SEARCH FOR AI -----
 
 function normalizeText(str) {
   return String(str || '')
@@ -161,78 +280,6 @@ function scoreChunks(userMessage, chunks) {
   return scored
 }
 
-// Create a new class (teacher only)
-export function createClass(teacherId, className, subject = '') {
-  const classes = getAllClasses()
-
-  let code = ''
-  for (let i = 0; i < 10; i += 1) {
-    const candidate = generateClassCode()
-    if (!classes.some(c => c.code === candidate)) {
-      code = candidate
-      break
-    }
-  }
-
-  if (!code) return null
-
-  const newClass = {
-    code,
-    name: cleanText(className, LIMITS.CLASS_NAME_MAX),
-    subject: cleanText(subject, LIMITS.SUBJECT_MAX),
-    teacherId,
-    createdAt: new Date().toISOString()
-  }
-
-  classes.push(newClass)
-  setAllClasses(classes)
-  return newClass
-}
-
-// Get all classes for the logged-in teacher
-export function getTeacherClasses(teacherId) {
-  return getAllClasses().filter(c => c.teacherId === teacherId)
-}
-
-// Get a specific class by code
-export function getClassByCode(code) {
-  const normalized = normalizeCode(code)
-  return getAllClasses().find(c => c.code === normalized) || null
-}
-
-// Student joins a class
-export function joinClass(studentId, classCode) {
-  const code = normalizeCode(classCode)
-  const enrollments = getAllEnrollments()
-  const exists = enrollments.some(e => e.studentId === studentId && e.classCode === code)
-  if (exists) return false
-  enrollments.push({ studentId, classCode: code })
-  setAllEnrollments(enrollments)
-  return true
-}
-
-// Get all classes the logged-in student is enrolled in
-export function getStudentClasses(studentId) {
-  const enrollments = getAllEnrollments().filter(e => e.studentId === studentId)
-  if (enrollments.length === 0) return []
-  const classes = getAllClasses()
-  return enrollments.map(e => classes.find(c => c.code === e.classCode)).filter(Boolean)
-}
-
-// Check if a student is enrolled in a class
-export function isStudentEnrolled(studentId, classCode) {
-  const code = normalizeCode(classCode)
-  return getAllEnrollments().some(e => e.studentId === studentId && e.classCode === code)
-}
-
-// Update class materials (teacher only)
-export function updateClassMaterials(classCode, materials) {
-  const text = String(materials || '').trim()
-  if (!text) return false
-  return upsertClassNotes(classCode, text)
-}
-
-// Material search helpers for AI grounding
 export function getRelevantChunks(userMessage, classCode) {
   const materials = getClassMaterials(classCode)
   if (!materials.length) return []
@@ -292,54 +339,11 @@ export function getPdfWarningsForClass(classCode) {
   return warnings
 }
 
-export function createMaterial(classCode, userId, material) {
-  const code = normalizeCode(classCode)
-  const all = getAllMaterials()
-  const item = {
-    id: material?.id || `mat_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
-    classCode: code,
-    userId: userId || null,
-    name: material?.name || 'Untitled',
-    type: material?.type || 'application/octet-stream',
-    size: material?.size || 0,
-    content: material?.content || '',
-    pageMetadata: material?.pageMetadata || null,
-    createdAt: new Date().toISOString()
+function generateClassCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let out = ''
+  for (let i = 0; i < 6; i += 1) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)]
   }
-  all.push(item)
-  setAllMaterials(all)
-  return item
-}
-
-export function getClassMaterials(classCode) {
-  const code = normalizeCode(classCode)
-  return getAllMaterials().filter(m => normalizeCode(m.classCode) === code)
-}
-
-export function deleteMaterial(materialId) {
-  const all = getAllMaterials()
-  const next = all.filter(m => m.id !== materialId)
-  setAllMaterials(next)
-}
-
-export function upsertClassNotes(classCode, text) {
-  const code = normalizeCode(classCode)
-  const all = getAllMaterials()
-  const id = `notes_${code}`
-  const idx = all.findIndex(m => m.id === id)
-  const item = {
-    id,
-    classCode: code,
-    userId: null,
-    name: 'Teacher Notes',
-    type: 'text/notes',
-    size: text.length,
-    content: text,
-    pageMetadata: null,
-    createdAt: new Date().toISOString()
-  }
-  if (idx >= 0) all[idx] = item
-  else all.push(item)
-  setAllMaterials(all)
-  return true
+  return out
 }

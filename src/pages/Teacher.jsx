@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { useUser } from '@clerk/clerk-react'
+import { useUser, useAuth } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -11,11 +11,14 @@ import {
   updateClassMaterials,
   createMaterial,
   getClassMaterials,
-  deleteMaterial
+  deleteMaterial,
+  saveClassMaterials,
+  syncClassMaterials
 } from '../utils/storage'
 
 function Teacher() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const [classes, setClasses] = useState([])
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
@@ -36,10 +39,13 @@ function Teacher() {
   }
 
   useEffect(() => {
-    if (user) {
-      const teacherClasses = getTeacherClasses(user.id)
-      setClasses(teacherClasses)
+    const load = async () => {
+      if (!user) return
+      const token = await getToken()
+      const teacherClasses = await getTeacherClasses(token)
+      setClasses(teacherClasses || [])
     }
+    load()
   }, [user])
 
   const ensurePdfWorker = () => {
@@ -149,8 +155,9 @@ function Teacher() {
     if (!newClassName.trim() || !user) return
     setIsCreating(true)
     await new Promise(r => setTimeout(r, 500))
-    const newClass = createClass(user.id, newClassName, newClassSubject)
-    setClasses([...classes, newClass])
+    const token = await getToken()
+    const newClass = await createClass(token, newClassName, newClassSubject)
+    setClasses([...classes, newClass].filter(Boolean))
     setNewClassName('')
     setNewClassSubject('')
     setShowCreateModal(false)
@@ -163,8 +170,10 @@ function Teacher() {
     setIsUploading(true)
     await new Promise(r => setTimeout(r, 500))
     if (notes.trim()) updateClassMaterials(selectedClass.code, notes)
-    const updatedClasses = getTeacherClasses(user.id)
-    setClasses(updatedClasses)
+    const token = await getToken()
+    await saveClassMaterials(token, selectedClass.code)
+    const updatedClasses = await getTeacherClasses(token)
+    setClasses(updatedClasses || [])
     setShowUploadModal(false)
     setSelectedClass(null)
     setNotes('')
@@ -173,13 +182,18 @@ function Teacher() {
   }
 
   const openUploadModal = (classItem) => {
-    setSelectedClass(classItem)
-    const mats = getClassMaterials(classItem.code)
-    const notesMat = mats.find(m => m.id === `notes_${classItem.code}` || m.type === 'text/notes')
-    setNotes(notesMat?.content || '')
-    setClassMaterials(mats)
-    setUploadError('')
-    setShowUploadModal(true)
+    const open = async () => {
+      setSelectedClass(classItem)
+      const token = await getToken()
+      await syncClassMaterials(token, classItem.code)
+      const mats = getClassMaterials(classItem.code)
+      const notesMat = mats.find(m => m.id === `notes_${classItem.code}` || m.type === 'text/notes')
+      setNotes(notesMat?.content || '')
+      setClassMaterials(mats)
+      setUploadError('')
+      setShowUploadModal(true)
+    }
+    open()
   }
 
   const handleChooseFiles = () => {
@@ -211,6 +225,8 @@ function Teacher() {
     }
 
     setClassMaterials(getClassMaterials(selectedClass.code))
+    const token = await getToken()
+    await saveClassMaterials(token, selectedClass.code)
     setIsUploading(false)
   }
 
@@ -219,6 +235,12 @@ function Teacher() {
     if (selectedClass) {
       setClassMaterials(getClassMaterials(selectedClass.code))
     }
+    const sync = async () => {
+      if (!selectedClass) return
+      const token = await getToken()
+      await saveClassMaterials(token, selectedClass.code)
+    }
+    sync()
   }
 
   return (

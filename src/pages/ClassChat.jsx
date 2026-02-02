@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { SignedIn, UserButton, useUser } from '@clerk/clerk-react'
-import { getClassByCode, isStudentEnrolled } from '../utils/storage'
+import { SignedIn, UserButton, useUser, useAuth } from '@clerk/clerk-react'
+import { getClassByCode, isStudentEnrolled, syncClassMaterials } from '../utils/storage'
 import { sendMessageToAI } from '../utils/openai'
 import ReactMarkdown from 'react-markdown'
 
@@ -12,6 +12,7 @@ import 'katex/dist/katex.min.css'
 function ClassChat() {
   const { classCode } = useParams()
   const { user } = useUser()
+  const { getToken } = useAuth()
   const navigate = useNavigate()
   const [classData, setClassData] = useState(null)
   const [messages, setMessages] = useState([])
@@ -29,29 +30,36 @@ function ClassChat() {
   }
 
   useEffect(() => {
-    if (!user) {
-      navigate('/student')
-      return
+    const load = async () => {
+      if (!user) {
+        navigate('/student')
+        return
+      }
+
+      const token = await getToken()
+      const data = await getClassByCode(token, classCode)
+      if (!data) {
+        navigate('/student')
+        return
+      }
+
+      const enrolled = await isStudentEnrolled(token, classCode)
+      if (!enrolled) {
+        navigate('/student')
+        return
+      }
+
+      await syncClassMaterials(token, classCode)
+
+      setClassData(data)
+
+      // Add welcome message
+      setMessages([{
+        role: 'assistant',
+        content: `Hello! I'm your AI tutor for ${data.name}. I'm here to help you understand the course material and guide you through concepts. Please note that I won't provide direct answers to assignments, but I'll help you learn and understand the material better. What would you like to explore today?`
+      }])
     }
-
-    const data = getClassByCode(classCode)
-    if (!data) {
-      navigate('/student')
-      return
-    }
-
-    if (!isStudentEnrolled(user.id, classCode)) {
-      navigate('/student')
-      return
-    }
-
-    setClassData(data)
-
-    // Add welcome message
-    setMessages([{
-      role: 'assistant',
-      content: `Hello! I'm your AI tutor for ${data.name}. I'm here to help you understand the course material and guide you through concepts. Please note that I won't provide direct answers to assignments, but I'll help you learn and understand the material better. What would you like to explore today?`
-    }])
+    load()
   }, [user, classCode, navigate])
 
   useEffect(() => {

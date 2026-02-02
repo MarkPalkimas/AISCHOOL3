@@ -12,6 +12,7 @@
   "dependencies": {
     "@clerk/clerk-react": "^4.30.0",
     "@clerk/clerk-sdk-node": "^5.0.0",
+    "@upstash/redis": "^1.34.3",
     "@vercel/kv": "^1.0.1",
     "katex": "^0.16.28",
     "mammoth": "^1.11.0",

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
-import { getStudentClasses, joinClass, getClassByCode } from '../utils/storage'
+import { getStudentClasses, joinClass, getClassByCode, getClassMaterials } from '../utils/storage'
 
 function Student() {
   const { user } = useUser()
@@ -36,7 +36,8 @@ function Student() {
       return
     }
 
-    if (!classData.materials) {
+    const materials = getClassMaterials(normalizedCode)
+    if (!materials || materials.length === 0) {
       setError('This class is not yet active. Ask your teacher to upload materials first.')
       setIsLoading(false)
       return

@@ -1,8 +1,18 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
-import { getTeacherClasses, createClass, updateClassMaterials } from '../utils/storage'
+import mammoth from 'mammoth'
+import * as XLSX from 'xlsx'
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
+import {
+  getTeacherClasses,
+  createClass,
+  updateClassMaterials,
+  createMaterial,
+  getClassMaterials,
+  deleteMaterial
+} from '../utils/storage'
 
 function Teacher() {
   const { user } = useUser()
@@ -12,9 +22,18 @@ function Teacher() {
   const [selectedClass, setSelectedClass] = useState(null)
   const [newClassName, setNewClassName] = useState('')
   const [newClassSubject, setNewClassSubject] = useState('')
-  const [materials, setMaterials] = useState('')
+  const [notes, setNotes] = useState('')
+  const [classMaterials, setClassMaterials] = useState([])
+  const [uploadError, setUploadError] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef(null)
+
+  const LIMITS = {
+    MAX_FILE_CHARS: 20000,
+    MAX_PAGE_CHARS: 1500,
+    MAX_PAGES: 30
+  }
 
   useEffect(() => {
     if (user) {
@@ -22,6 +41,108 @@ function Teacher() {
       setClasses(teacherClasses)
     }
   }, [user])
+
+  const ensurePdfWorker = () => {
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
+          import.meta.url
+        ).toString()
+      } catch {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+      }
+    }
+  }
+
+  const compressText = (text, maxChars) => {
+    const cleaned = String(text || '')
+      .replace(/\r/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (cleaned.length <= maxChars) return cleaned
+    return cleaned.slice(0, maxChars) + '…'
+  }
+
+  const extractTextFromPdf = async (file) => {
+    ensurePdfWorker()
+    const buffer = await file.arrayBuffer()
+    const loadingTask = pdfjsLib.getDocument({ data: buffer })
+    const pdf = await loadingTask.promise
+    const maxPages = Math.min(pdf.numPages, LIMITS.MAX_PAGES)
+    const pageMetadata = []
+    let fullText = ''
+
+    for (let i = 1; i <= maxPages; i += 1) {
+      const page = await pdf.getPage(i)
+      const textContent = await page.getTextContent()
+      const pageText = (textContent.items || [])
+        .map(item => (item && typeof item.str === 'string') ? item.str : '')
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (pageText) {
+        const trimmed = compressText(pageText, LIMITS.MAX_PAGE_CHARS)
+        pageMetadata.push({ pageNumber: i, text: trimmed })
+        fullText += trimmed + '\n\n'
+      }
+    }
+
+    if (!fullText.trim()) {
+      return {
+        text: '[PDF EXTRACTION WARNING: 0 characters extracted]',
+        pageMetadata: []
+      }
+    }
+
+    return {
+      text: compressText(fullText, LIMITS.MAX_FILE_CHARS),
+      pageMetadata
+    }
+  }
+
+  const extractTextFromFile = async (file) => {
+    const name = (file.name || '').toLowerCase()
+    const type = (file.type || '').toLowerCase()
+
+    if (type.startsWith('video/')) {
+      return { error: 'Video files are not supported for AI materials.' }
+    }
+
+    if (name.endsWith('.pdf')) {
+      return extractTextFromPdf(file)
+    }
+
+    if (name.endsWith('.docx')) {
+      const buffer = await file.arrayBuffer()
+      const result = await mammoth.extractRawText({ arrayBuffer: buffer })
+      return { text: compressText(result?.value || '', LIMITS.MAX_FILE_CHARS), pageMetadata: null }
+    }
+
+    if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
+      const buffer = await file.arrayBuffer()
+      const workbook = XLSX.read(buffer, { type: 'array' })
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+      const csv = XLSX.utils.sheet_to_csv(firstSheet)
+      return { text: compressText(csv, LIMITS.MAX_FILE_CHARS), pageMetadata: null }
+    }
+
+    if (/\.(txt|md|html|htm|json|rtf|ppt|pptx)$/i.test(name) || type.startsWith('text/')) {
+      const text = await file.text()
+      return { text: compressText(text, LIMITS.MAX_FILE_CHARS), pageMetadata: null }
+    }
+
+    if (type.startsWith('image/')) {
+      return { text: `Image file (${file.name}). No OCR available in-browser.`, pageMetadata: null }
+    }
+
+    try {
+      const text = await file.text()
+      return { text: compressText(text, LIMITS.MAX_FILE_CHARS), pageMetadata: null }
+    } catch {
+      return { text: `Uploaded file: ${file.name}. Content could not be extracted.`, pageMetadata: null }
+    }
+  }
 
   const handleCreateClass = async (e) => {
     e.preventDefault()
@@ -38,22 +159,66 @@ function Teacher() {
 
   const handleUploadMaterials = async (e) => {
     e.preventDefault()
-    if (!materials.trim() || !selectedClass) return
+    if (!selectedClass) return
     setIsUploading(true)
     await new Promise(r => setTimeout(r, 500))
-    updateClassMaterials(selectedClass.code, materials)
+    if (notes.trim()) updateClassMaterials(selectedClass.code, notes)
     const updatedClasses = getTeacherClasses(user.id)
     setClasses(updatedClasses)
-    setMaterials('')
     setShowUploadModal(false)
     setSelectedClass(null)
+    setNotes('')
+    setClassMaterials([])
     setIsUploading(false)
   }
 
   const openUploadModal = (classItem) => {
     setSelectedClass(classItem)
-    setMaterials(classItem.materials || '')
+    const mats = getClassMaterials(classItem.code)
+    const notesMat = mats.find(m => m.id === `notes_${classItem.code}` || m.type === 'text/notes')
+    setNotes(notesMat?.content || '')
+    setClassMaterials(mats)
+    setUploadError('')
     setShowUploadModal(true)
+  }
+
+  const handleChooseFiles = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFilesSelected = async (e) => {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (!selectedClass || files.length === 0) return
+
+    setUploadError('')
+    setIsUploading(true)
+
+    for (const file of files) {
+      const { text, pageMetadata, error } = await extractTextFromFile(file)
+      if (error) {
+        setUploadError(error)
+        continue
+      }
+
+      createMaterial(selectedClass.code, user?.id, {
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: file.size,
+        content: text || '',
+        pageMetadata
+      })
+    }
+
+    setClassMaterials(getClassMaterials(selectedClass.code))
+    setIsUploading(false)
+  }
+
+  const handleDeleteMaterial = (materialId) => {
+    deleteMaterial(materialId)
+    if (selectedClass) {
+      setClassMaterials(getClassMaterials(selectedClass.code))
+    }
   }
 
   return (
@@ -96,7 +261,10 @@ function Teacher() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
-            {classes.map((classItem) => (
+            {classes.map((classItem) => {
+              const materialCount = getClassMaterials(classItem.code).length
+              const hasMaterials = materialCount > 0
+              return (
               <div key={classItem.code} className="feature-card" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -105,8 +273,8 @@ function Teacher() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                       </svg>
                     </div>
-                    <span style={{ padding: '4px 12px', background: classItem.materials ? '#DEF7EC' : '#FEF3C7', color: classItem.materials ? '#059669' : '#D97706', borderRadius: '12px', fontSize: '12px', fontWeight: '600' }}>
-                      {classItem.materials ? 'Active' : 'Setup Needed'}
+                    <span style={{ padding: '4px 12px', background: hasMaterials ? '#DEF7EC' : '#FEF3C7', color: hasMaterials ? '#059669' : '#D97706', borderRadius: '12px', fontSize: '12px', fontWeight: '600' }}>
+                      {hasMaterials ? `Active (${materialCount})` : 'Setup Needed'}
                     </span>
                   </div>
 
@@ -128,10 +296,10 @@ function Teacher() {
                 </div>
 
                 <button onClick={() => openUploadModal(classItem)} className="btn-secondary" style={{ width: '100%' }}>
-                  {classItem.materials ? 'Update Materials' : 'Upload Materials'}
+                  {hasMaterials ? 'Manage Materials' : 'Upload Materials'}
                 </button>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>
@@ -214,16 +382,40 @@ function Teacher() {
             </p>
             
             <form onSubmit={handleUploadMaterials}>
-              <div style={{ marginBottom: '16px' }}>
-                <label htmlFor="materials" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
-                  Course Materials and Information
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                  Upload Files (all types except videos)
+                </label>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button type="button" onClick={handleChooseFiles} className="btn-secondary">
+                    Add Files
+                  </button>
+                  <span style={{ fontSize: '12px', color: '#6B7280' }}>
+                    PDFs, DOCX, TXT/MD, CSV/XLSX, JSON, Images, and more
+                  </span>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFilesSelected}
+                  style={{ display: 'none' }}
+                />
+                {uploadError && (
+                  <p style={{ fontSize: '12px', color: '#DC2626', marginTop: '8px' }}>{uploadError}</p>
+                )}
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label htmlFor="notes" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                  Teacher Notes (optional)
                 </label>
                 <textarea
-                  id="materials"
-                  value={materials}
-                  onChange={(e) => setMaterials(e.target.value)}
-                  placeholder="Enter your syllabus, course description, key topics, lecture notes, or any information you want the AI to reference when helping students..."
-                  rows="12"
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add quick notes or a syllabus summary to guide the AI..."
+                  rows="6"
                   style={{
                     width: '100%',
                     padding: '12px 16px',
@@ -234,11 +426,33 @@ function Teacher() {
                     fontFamily: 'inherit',
                     resize: 'vertical'
                   }}
-                  required
                 />
                 <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>
-                  The AI will use this information to help students understand your course material
+                  We compress files to reduce token use while keeping key content searchable.
                 </p>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                  Uploaded Materials
+                </label>
+                {classMaterials.length === 0 ? (
+                  <p style={{ fontSize: '13px', color: '#6B7280' }}>No materials uploaded yet.</p>
+                ) : (
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {classMaterials.map((mat) => (
+                      <div key={mat.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{mat.name}</div>
+                          <div style={{ fontSize: '12px', color: '#6B7280' }}>{mat.type || 'file'}</div>
+                        </div>
+                        <button type="button" onClick={() => handleDeleteMaterial(mat.id)} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '12px' }}>
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '12px' }}>
@@ -246,8 +460,9 @@ function Teacher() {
                   type="button"
                   onClick={() => {
                     setShowUploadModal(false)
-                    setMaterials('')
                     setSelectedClass(null)
+                    setNotes('')
+                    setClassMaterials([])
                   }}
                   className="btn-secondary"
                   style={{ flex: 1 }}
@@ -256,12 +471,12 @@ function Teacher() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!materials.trim() || isUploading}
+                  disabled={isUploading}
                   className="btn-primary"
                   style={{ 
                     flex: 1,
-                    opacity: (!materials.trim() || isUploading) ? '0.5' : '1',
-                    cursor: (!materials.trim() || isUploading) ? 'not-allowed' : 'pointer'
+                    opacity: isUploading ? '0.5' : '1',
+                    cursor: isUploading ? 'not-allowed' : 'pointer'
                   }}
                 >
                   {isUploading ? 'Saving...' : 'Save Materials'}

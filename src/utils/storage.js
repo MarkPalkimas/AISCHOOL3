@@ -9,12 +9,14 @@ const LIMITS = {
 
 const STORAGE_KEYS = {
   classes: 'classai_classes_v1',
-  enrollments: 'classai_enrollments_v1'
+  enrollments: 'classai_enrollments_v1',
+  materials: 'classai_materials_v2'
 }
 
 const memoryStore = {
   classes: [],
-  enrollments: []
+  enrollments: [],
+  materials: []
 }
 
 function canUseStorage() {
@@ -36,6 +38,7 @@ function setLocalJSON(key, value) {
   if (!canUseStorage()) {
     if (key === STORAGE_KEYS.classes) memoryStore.classes = value
     if (key === STORAGE_KEYS.enrollments) memoryStore.enrollments = value
+    if (key === STORAGE_KEYS.materials) memoryStore.materials = value
     return
   }
   try {
@@ -57,6 +60,15 @@ function setAllClasses(next) {
 function getAllEnrollments() {
   const data = getLocalJSON(STORAGE_KEYS.enrollments, memoryStore.enrollments)
   return Array.isArray(data) ? data : []
+}
+
+function getAllMaterials() {
+  const data = getLocalJSON(STORAGE_KEYS.materials, memoryStore.materials)
+  return Array.isArray(data) ? data : []
+}
+
+function setAllMaterials(next) {
+  setLocalJSON(STORAGE_KEYS.materials, next)
 }
 
 function setAllEnrollments(next) {
@@ -169,7 +181,6 @@ export function createClass(teacherId, className, subject = '') {
     name: cleanText(className, LIMITS.CLASS_NAME_MAX),
     subject: cleanText(subject, LIMITS.SUBJECT_MAX),
     teacherId,
-    materials: '',
     createdAt: new Date().toISOString()
   }
 
@@ -216,22 +227,36 @@ export function isStudentEnrolled(studentId, classCode) {
 
 // Update class materials (teacher only)
 export function updateClassMaterials(classCode, materials) {
-  const code = normalizeCode(classCode)
-  const classes = getAllClasses()
-  const idx = classes.findIndex(c => c.code === code)
-  if (idx === -1) return false
-  classes[idx] = { ...classes[idx], materials: String(materials || '').trim() }
-  setAllClasses(classes)
-  return true
+  const text = String(materials || '').trim()
+  if (!text) return false
+  return upsertClassNotes(classCode, text)
 }
 
 // Material search helpers for AI grounding
 export function getRelevantChunks(userMessage, classCode) {
-  const classItem = getClassByCode(classCode)
-  if (!classItem || !classItem.materials) return []
+  const materials = getClassMaterials(classCode)
+  if (!materials.length) return []
 
-  const chunks = splitIntoChunks(classItem.materials)
-    .map(text => ({ text, materialName: classItem.name || 'Class Materials' }))
+  const chunks = []
+
+  for (const mat of materials) {
+    if (Array.isArray(mat.pageMetadata) && mat.pageMetadata.length > 0) {
+      for (const page of mat.pageMetadata) {
+        if (!page?.text) continue
+        chunks.push({
+          text: page.text,
+          materialName: mat.name,
+          pageNumber: page.pageNumber
+        })
+      }
+      continue
+    }
+
+    const parts = splitIntoChunks(mat.content || '')
+    for (const p of parts) {
+      chunks.push({ text: p, materialName: mat.name })
+    }
+  }
 
   const scored = scoreChunks(userMessage, chunks)
   if (!scored.length) return []
@@ -244,7 +269,7 @@ export function getRelevantChunks(userMessage, classCode) {
     const text = String(item.text || '').trim()
     if (!text) continue
     if (totalChars + text.length > LIMITS.MAX_MATERIALS_CHARS_SENT) break
-    limited.push({ text, materialName: item.materialName })
+    limited.push({ text, materialName: item.materialName, pageNumber: item.pageNumber })
     totalChars += text.length
   }
 
@@ -252,14 +277,69 @@ export function getRelevantChunks(userMessage, classCode) {
 }
 
 export function getPdfWarningsForClass(classCode) {
-  const classItem = getClassByCode(classCode)
-  if (!classItem || !classItem.materials) return []
-  const content = String(classItem.materials)
-  if (content.includes('[PDF EXTRACTION WARNING:') || content.includes('[PDF EXTRACTION ERROR:')) {
-    return [{
-      materialName: classItem.name || 'Class Materials',
-      text: content.slice(0, 2000)
-    }]
+  const materials = getClassMaterials(classCode)
+  if (!materials.length) return []
+  const warnings = []
+  for (const mat of materials) {
+    const content = String(mat.content || '')
+    if (content.includes('[PDF EXTRACTION WARNING:') || content.includes('[PDF EXTRACTION ERROR:')) {
+      warnings.push({
+        materialName: mat.name,
+        text: content.slice(0, 2000)
+      })
+    }
   }
-  return []
+  return warnings
+}
+
+export function createMaterial(classCode, userId, material) {
+  const code = normalizeCode(classCode)
+  const all = getAllMaterials()
+  const item = {
+    id: material?.id || `mat_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+    classCode: code,
+    userId: userId || null,
+    name: material?.name || 'Untitled',
+    type: material?.type || 'application/octet-stream',
+    size: material?.size || 0,
+    content: material?.content || '',
+    pageMetadata: material?.pageMetadata || null,
+    createdAt: new Date().toISOString()
+  }
+  all.push(item)
+  setAllMaterials(all)
+  return item
+}
+
+export function getClassMaterials(classCode) {
+  const code = normalizeCode(classCode)
+  return getAllMaterials().filter(m => normalizeCode(m.classCode) === code)
+}
+
+export function deleteMaterial(materialId) {
+  const all = getAllMaterials()
+  const next = all.filter(m => m.id !== materialId)
+  setAllMaterials(next)
+}
+
+export function upsertClassNotes(classCode, text) {
+  const code = normalizeCode(classCode)
+  const all = getAllMaterials()
+  const id = `notes_${code}`
+  const idx = all.findIndex(m => m.id === id)
+  const item = {
+    id,
+    classCode: code,
+    userId: null,
+    name: 'Teacher Notes',
+    type: 'text/notes',
+    size: text.length,
+    content: text,
+    pageMetadata: null,
+    createdAt: new Date().toISOString()
+  }
+  if (idx >= 0) all[idx] = item
+  else all.push(item)
+  setAllMaterials(all)
+  return true
 }

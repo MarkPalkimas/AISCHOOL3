@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const redis = getRedis();
+        const redis = await getRedis();
         const userId = await verifyAuth(req);
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });

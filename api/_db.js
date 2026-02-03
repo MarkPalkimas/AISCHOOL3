@@ -1,6 +1,8 @@
-import { kv } from '@vercel/kv';
+let kvClient = null;
 
-export function getRedis() {
-  // @vercel/kv reads KV_REST_API_URL / KV_REST_API_TOKEN automatically
-  return kv;
+export async function getRedis() {
+  if (kvClient) return kvClient;
+  const mod = await import('@vercel/kv');
+  kvClient = mod.kv;
+  return kvClient;
 }

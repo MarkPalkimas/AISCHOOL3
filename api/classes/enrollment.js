@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     if (!code) return res.status(400).json({ error: 'Missing code' });
 
     try {
-        const redis = getRedis();
+        const redis = await getRedis();
         const count = await redis.scard(`class:${code.toUpperCase().trim()}:students`);
         return res.status(200).json({ count: count || 0 });
     } catch (error) {

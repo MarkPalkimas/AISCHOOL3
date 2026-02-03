@@ -360,9 +360,12 @@ export function getPdfWarningsForClass(classCode) {
     const content = String(mat.content || '')
     if (mat.status === 'warning' || mat.status === 'error' ||
       content.includes('[PDF EXTRACTION WARNING:') || content.includes('[PDF EXTRACTION ERROR:')) {
+      const msg = mat.errorMessage
+        ? `PDF extraction issue: ${mat.errorMessage}`
+        : 'PDF extraction issue: No selectable text found.'
       warnings.push({
         materialName: mat.name,
-        text: (mat.errorMessage || content).slice(0, 2000)
+        text: msg.slice(0, 2000)
       })
     }
   }

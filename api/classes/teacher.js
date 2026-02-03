@@ -35,16 +35,6 @@ export default async function handler(req, res) {
         return res.status(200).json(validClasses);
     } catch (error) {
         console.error(error);
-        return res.status(500).json({
-            error: error.message,
-            stack: error.stack,
-            env: {
-                hasKvUrl: !!process.env.KV_REST_API_URL,
-                hasKvToken: !!process.env.KV_REST_API_TOKEN,
-                hasUpstashUrl: !!process.env.UPSTASH_REDIS_REST_URL,
-                hasUpstashToken: !!process.env.UPSTASH_REDIS_REST_TOKEN,
-                hasClerk: !!process.env.CLERK_SECRET_KEY
-            }
-        });
+        return res.status(500).json({ error: error.message || 'Server error' });
     }
 }

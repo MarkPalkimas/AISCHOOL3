@@ -238,19 +238,9 @@ ${filteredMaterials || (anyMaterials ? 'Materials are available but no matching 
 END_MATERIALS_CONTEXT
 
 ${pdfExtractionFailed ? `
-CRITICAL SYSTEM INSTRUCTION: 
-A PDF was uploaded but text extraction failed (0 characters extracted, likely scanned).
-DO NOT answer the student's question using general knowledge.
-INSTEAD, reply exactly with:
-"⚠️ **PDF Extraction Failed**
-I see you uploaded a PDF, but I couldn't extract any text from it (0 characters).
-- It might be a scanned image without OCR.
-- It might be empty or corrupted.
-
-**Debug Info:**
-${filteredMaterials.match(/Debug Info: (.*?)\]/)?.[1] || 'Check worker load errors'}
-
-Please upload a PDF with selectable text."
+CRITICAL SYSTEM INSTRUCTION:
+A PDF was uploaded but no selectable text could be extracted (likely scanned).
+Do NOT answer from general knowledge. Ask the student to upload a searchable PDF.
 ` : ''}
 
 CODE_CONTEXT:

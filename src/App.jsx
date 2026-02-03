@@ -54,7 +54,7 @@ function HomePage() {
             <img
               src="/Logo.jpg"
               alt="ClassAI Logo"
-              style={{ width: '32px', height: '32px', objectFit: 'contain' }}
+              style={{ width: '64px', height: '64px', objectFit: 'contain' }}
             />
             <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
           </Link>

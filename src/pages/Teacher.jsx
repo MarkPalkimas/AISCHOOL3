@@ -395,7 +395,9 @@ function Teacher() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
             {classes.map((classItem) => {
-              const materialCount = getClassMaterials(classItem.code).length
+              const serverCount = Array.isArray(classItem.materials) ? classItem.materials.length : 0
+              const localCount = getClassMaterials(classItem.code).length
+              const materialCount = serverCount || localCount
               const hasMaterials = materialCount > 0
               return (
               <div key={classItem.code} className="feature-card" style={{ display: 'flex', flexDirection: 'column' }}>

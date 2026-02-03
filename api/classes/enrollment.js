@@ -1,4 +1,4 @@
-import { redis } from '../_db.js';
+import { getRedis } from '../_db.js';
 
 // Public endpoint? Or auth protected? 
 // storage.js implementation of `getEnrolledCount` does NOT pass token.
@@ -19,6 +19,7 @@ export default async function handler(req, res) {
     if (!code) return res.status(400).json({ error: 'Missing code' });
 
     try {
+        const redis = getRedis();
         const count = await redis.scard(`class:${code.toUpperCase().trim()}:students`);
         return res.status(200).json({ count: count || 0 });
     } catch (error) {

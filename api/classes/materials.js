@@ -1,4 +1,4 @@
-import { redis } from '../_db.js';
+import { getRedis } from '../_db.js';
 import { verifyAuth } from '../_auth.js';
 
 export default async function handler(req, res) {
@@ -7,6 +7,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    const redis = getRedis();
     const userId = await verifyAuth(req);
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });

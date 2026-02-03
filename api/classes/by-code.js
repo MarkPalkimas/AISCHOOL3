@@ -1,4 +1,4 @@
-import { redis } from '../_db.js';
+import { getRedis } from '../_db.js';
 import { verifyAuth } from '../_auth.js';
 
 export default async function handler(req, res) {
@@ -21,6 +21,7 @@ export default async function handler(req, res) {
     }
 
     try {
+        const redis = getRedis();
         const classData = await redis.get(`class:${normalizedCode}`);
         if (classData) {
             return res.status(200).json(classData);

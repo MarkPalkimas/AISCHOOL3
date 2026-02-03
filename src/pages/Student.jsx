@@ -42,8 +42,8 @@ function Student() {
       return
     }
 
-    const materials = await syncClassMaterials(token, normalizedCode)
-    if (!materials || materials.length === 0) {
+    const hasMaterials = Array.isArray(classData?.materials) && classData.materials.length > 0
+    if (!hasMaterials) {
       setError('This class is not yet active. Ask your teacher to upload materials first.')
       setIsLoading(false)
       return
@@ -55,8 +55,9 @@ function Student() {
       const updatedClasses = await getStudentClasses(token)
       setClasses(updatedClasses || [])
       setTeacherCode('')
+      await syncClassMaterials(token, normalizedCode)
     } else {
-      setError('You are already enrolled in this class.')
+      setError('You are already enrolled in this class or join failed.')
     }
     
     setIsLoading(false)

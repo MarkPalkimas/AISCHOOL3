@@ -37,6 +37,16 @@ When responding to a student:
 4. Use a narrative flow rather than a clinical report style.
 
 ========================
+FORMATTING RULES
+========================
+- Use Markdown.
+- All math must be formatted with LaTeX:
+  - Display math: use $$ ... $$ or \[ ... \]
+  - Inline math: use \( ... \)
+- Do NOT output math in plain brackets like [ ... ].
+- Code or pseudo-code must be in fenced code blocks.
+
+========================
 RESPONSE ARCHITECTURE
 ========================
 Start with a brief conversational greeting or direct address of the question.

@@ -159,6 +159,8 @@ export function createMaterial(classCode, userId, material) {
     size: material?.size || 0,
     content: material?.content || '',
     summary: material?.summary || '',
+    status: material?.status || 'ok',
+    errorMessage: material?.errorMessage || '',
     pageMetadata: material?.pageMetadata || null,
     createdAt: new Date().toISOString()
   }
@@ -304,6 +306,7 @@ export function getRelevantChunks(userMessage, classCode) {
   const chunks = []
 
   for (const mat of materials) {
+    if (mat.status && mat.status !== 'ok') continue
     if (mat.summary) {
       chunks.push({
         text: `Summary: ${mat.summary}`,
@@ -355,14 +358,35 @@ export function getPdfWarningsForClass(classCode) {
   const warnings = []
   for (const mat of materials) {
     const content = String(mat.content || '')
-    if (content.includes('[PDF EXTRACTION WARNING:') || content.includes('[PDF EXTRACTION ERROR:')) {
+    if (mat.status === 'warning' || mat.status === 'error' ||
+      content.includes('[PDF EXTRACTION WARNING:') || content.includes('[PDF EXTRACTION ERROR:')) {
       warnings.push({
         materialName: mat.name,
-        text: content.slice(0, 2000)
+        text: (mat.errorMessage || content).slice(0, 2000)
       })
     }
   }
   return warnings
+}
+
+export function getMaterialSummaries(classCode, maxItems = 6) {
+  const materials = getClassMaterials(classCode)
+  if (!materials.length) return []
+
+  const summaries = []
+  for (const mat of materials) {
+    if (mat.status && mat.status !== 'ok') continue
+    const base = mat.summary || mat.content || ''
+    if (!base) continue
+    const text = String(base).slice(0, 800)
+    summaries.push({
+      text,
+      materialName: mat.name,
+      pageNumber: mat.pageNumber
+    })
+    if (summaries.length >= maxItems) break
+  }
+  return summaries
 }
 
 function generateClassCode() {

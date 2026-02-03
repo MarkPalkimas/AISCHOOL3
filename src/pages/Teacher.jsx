@@ -114,51 +114,65 @@ function Teacher() {
   }
 
   const extractTextFromPdf = async (file) => {
-    ensurePdfWorker()
-    const buffer = await file.arrayBuffer()
-    const loadingTask = pdfjsLib.getDocument({ data: buffer })
-    const pdf = await loadingTask.promise
-    const maxPages = Math.min(pdf.numPages, LIMITS.MAX_PAGES)
-    const pageMetadata = []
-    let fullText = ''
+    try {
+      ensurePdfWorker()
+      const buffer = await file.arrayBuffer()
+      const loadingTask = pdfjsLib.getDocument({ data: buffer })
+      const pdf = await loadingTask.promise
+      const maxPages = Math.min(pdf.numPages, LIMITS.MAX_PAGES)
+      const pageMetadata = []
+      let fullText = ''
 
-    for (let i = 1; i <= maxPages; i += 1) {
-      const page = await pdf.getPage(i)
-      const textContent = await page.getTextContent()
-      const items = (textContent.items || []).filter(item => item && typeof item.str === 'string')
-      const lines = new Map()
-      for (const item of items) {
-        const y = Math.round(item.transform?.[5] || 0)
-        const line = lines.get(y) || []
-        line.push(item.str)
-        lines.set(y, line)
+      for (let i = 1; i <= maxPages; i += 1) {
+        const page = await pdf.getPage(i)
+        const textContent = await page.getTextContent()
+        const items = (textContent.items || []).filter(item => item && typeof item.str === 'string')
+        const lines = new Map()
+        for (const item of items) {
+          const y = Math.round(item.transform?.[5] || 0)
+          const line = lines.get(y) || []
+          line.push(item.str)
+          lines.set(y, line)
+        }
+        const pageText = Array.from(lines.entries())
+          .sort((a, b) => b[0] - a[0])
+          .map(([, line]) => line.join(' '))
+          .join('\n')
+          .replace(/\s+\n/g, '\n')
+          .replace(/[ \t]+/g, ' ')
+          .trim()
+        if (pageText) {
+          const trimmed = compressText(pageText, LIMITS.MAX_PAGE_CHARS)
+          pageMetadata.push({ pageNumber: i, text: trimmed })
+          fullText += trimmed + '\n\n'
+        }
       }
-      const pageText = Array.from(lines.entries())
-        .sort((a, b) => b[0] - a[0])
-        .map(([, line]) => line.join(' '))
-        .join('\n')
-        .replace(/\s+\n/g, '\n')
-        .replace(/[ \t]+/g, ' ')
-        .trim()
-      if (pageText) {
-        const trimmed = compressText(pageText, LIMITS.MAX_PAGE_CHARS)
-        pageMetadata.push({ pageNumber: i, text: trimmed })
-        fullText += trimmed + '\n\n'
-      }
-    }
 
-    if (!fullText.trim()) {
+      if (!fullText.trim()) {
+        return {
+          text: '[PDF EXTRACTION WARNING: 0 characters extracted]',
+          pageMetadata: [],
+          summary: '',
+          status: 'warning',
+          errorMessage: 'No text could be extracted (possibly scanned).'
+        }
+      }
+
       return {
-        text: '[PDF EXTRACTION WARNING: 0 characters extracted]',
-        pageMetadata: [],
-        summary: ''
+        text: compressText(fullText, LIMITS.MAX_FILE_CHARS),
+        pageMetadata,
+        summary: summarizeText(fullText),
+        status: 'ok',
+        errorMessage: ''
       }
-    }
-
-    return {
-      text: compressText(fullText, LIMITS.MAX_FILE_CHARS),
-      pageMetadata,
-      summary: summarizeText(fullText)
+    } catch (err) {
+      return {
+        text: `[PDF EXTRACTION ERROR: ${String(err?.message || err)}]`,
+        pageMetadata: [],
+        summary: '',
+        status: 'error',
+        errorMessage: String(err?.message || err)
+      }
     }
   }
 
@@ -181,7 +195,9 @@ function Teacher() {
       return {
         text: compressText(raw, LIMITS.MAX_FILE_CHARS),
         pageMetadata: null,
-        summary: summarizeText(raw)
+        summary: summarizeText(raw),
+        status: raw ? 'ok' : 'warning',
+        errorMessage: raw ? '' : 'No text extracted from DOCX.'
       }
     }
 
@@ -193,7 +209,9 @@ function Teacher() {
       return {
         text: compressText(csv, LIMITS.MAX_FILE_CHARS),
         pageMetadata: null,
-        summary: summarizeText(csv)
+        summary: summarizeText(csv),
+        status: csv ? 'ok' : 'warning',
+        errorMessage: csv ? '' : 'No text extracted from spreadsheet.'
       }
     }
 
@@ -202,7 +220,9 @@ function Teacher() {
       return {
         text: compressText(text, LIMITS.MAX_FILE_CHARS),
         pageMetadata: null,
-        summary: summarizeText(text)
+        summary: summarizeText(text),
+        status: text ? 'ok' : 'warning',
+        errorMessage: text ? '' : 'No text extracted from file.'
       }
     }
 
@@ -212,7 +232,9 @@ function Teacher() {
       return {
         text: compressText(combined || `Image file (${file.name})`, LIMITS.MAX_FILE_CHARS),
         pageMetadata: null,
-        summary: ocr?.summary || summarizeText(combined)
+        summary: ocr?.summary || summarizeText(combined),
+        status: combined ? 'ok' : 'warning',
+        errorMessage: combined ? '' : 'OCR returned no text.'
       }
     }
 
@@ -221,13 +243,17 @@ function Teacher() {
       return {
         text: compressText(text, LIMITS.MAX_FILE_CHARS),
         pageMetadata: null,
-        summary: summarizeText(text)
+        summary: summarizeText(text),
+        status: text ? 'ok' : 'warning',
+        errorMessage: text ? '' : 'No text extracted from file.'
       }
     } catch {
       return {
         text: `Uploaded file: ${file.name}. Content could not be extracted.`,
         pageMetadata: null,
-        summary: ''
+        summary: '',
+        status: 'error',
+        errorMessage: 'Content could not be extracted.'
       }
     }
   }
@@ -291,7 +317,7 @@ function Teacher() {
     setIsUploading(true)
 
     for (const file of files) {
-      const { text, pageMetadata, summary, error } = await extractTextFromFile(file)
+      const { text, pageMetadata, summary, status, errorMessage, error } = await extractTextFromFile(file)
       if (error) {
         setUploadError(error)
         continue
@@ -303,7 +329,9 @@ function Teacher() {
         size: file.size,
         content: text || '',
         pageMetadata,
-        summary: summary || ''
+        summary: summary || '',
+        status: status || 'ok',
+        errorMessage: errorMessage || ''
       })
     }
 
@@ -546,10 +574,40 @@ function Teacher() {
                 ) : (
                   <div style={{ display: 'grid', gap: '8px' }}>
                     {classMaterials.map((mat) => (
-                      <div key={mat.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
+                      <div
+                        key={mat.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '8px',
+                          background: mat.status === 'error' ? '#FEF2F2' : mat.status === 'warning' ? '#FFFBEB' : 'white'
+                        }}
+                      >
                         <div>
-                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{mat.name}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{mat.name}</div>
+                            {mat.status && mat.status !== 'ok' && (
+                              <span style={{
+                                padding: '2px 8px',
+                                fontSize: '11px',
+                                borderRadius: '999px',
+                                background: mat.status === 'error' ? '#FCA5A5' : '#FDE68A',
+                                color: '#7C2D12',
+                                fontWeight: 700
+                              }}>
+                                {mat.status === 'error' ? 'Unreadable' : 'Warning'}
+                              </span>
+                            )}
+                          </div>
                           <div style={{ fontSize: '12px', color: '#6B7280' }}>{mat.type || 'file'}</div>
+                          {mat.errorMessage && (
+                            <div style={{ fontSize: '12px', color: '#B91C1C', marginTop: '4px' }}>
+                              {mat.errorMessage}
+                            </div>
+                          )}
                         </div>
                         <button type="button" onClick={() => handleDeleteMaterial(mat.id)} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '12px' }}>
                           Remove

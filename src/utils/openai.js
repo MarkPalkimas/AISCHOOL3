@@ -1,5 +1,5 @@
 // OpenAI API integration for AI chat functionality
-import { getRelevantChunks, getPdfWarningsForClass } from './storage'
+import { getRelevantChunks, getPdfWarningsForClass, getMaterialSummaries, getClassMaterials } from './storage'
 
 const LIMITS = {
   //Hard cap to prevent token spam - enforcing 6500 char limit as requested
@@ -151,10 +151,12 @@ function trimChunk(s, maxChars) {
 
 function buildFilteredMaterials(userMessage, classCode) {
   const chunks = getRelevantChunks(userMessage, classCode)
-  if (chunks.length === 0) return ''
+  const fallbackSummaries = chunks.length === 0 ? getMaterialSummaries(classCode) : []
+  if (chunks.length === 0 && fallbackSummaries.length === 0) return ''
 
   // Build context with page citations when available
-  const context = chunks.map(c => {
+  const contextSource = chunks.length > 0 ? chunks : fallbackSummaries
+  const context = contextSource.map(c => {
     const source = c.materialName || 'Course Notes'
     const pageInfo = c.pageNumber ? `, Page ${c.pageNumber}` : ''
     return `[Snippet from: ${source}${pageInfo}]\n${c.text}`
@@ -207,6 +209,7 @@ function buildMaterialsFirstResponse(userMessage, hasCoverage, isDirectAnswer) {
 
 export async function sendMessageToAI(userMessage, classCode, conversationHistory = []) {
   try {
+    const anyMaterials = getClassMaterials(classCode).length > 0
     let filteredMaterials = buildFilteredMaterials(userMessage, classCode)
 
     //Always prepend PDF extraction warnings if they exist
@@ -222,15 +225,16 @@ export async function sendMessageToAI(userMessage, classCode, conversationHistor
 
     // Check for scanned/empty PDF warning (support WARNING + ERROR)
     const pdfExtractionFailed =
-      filteredMaterials.includes('[PDF EXTRACTION WARNING:') ||
-      filteredMaterials.includes('[PDF EXTRACTION ERROR:')
+      pdfWarnings.length > 0 &&
+      (!filteredMaterials || filteredMaterials.trim().length === 0) &&
+      !anyMaterials
 
     // Construct the standard INPUT FORMAT specified by the user
     const structuredInput = `
-MATERIALS_AVAILABLE: ${filteredMaterials ? 'true' : 'false'}
+MATERIALS_AVAILABLE: ${anyMaterials ? 'true' : 'false'}
 
 MATERIALS_CONTEXT:
-${filteredMaterials || 'No teacher materials provided for this query.'}
+${filteredMaterials || (anyMaterials ? 'Materials are available but no matching snippets were found. Use summaries if possible.' : 'No teacher materials provided for this query.')}
 END_MATERIALS_CONTEXT
 
 ${pdfExtractionFailed ? `

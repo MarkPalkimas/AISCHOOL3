@@ -1,5 +1,7 @@
 import { getRedis } from '../_db.js';
 
+export const config = { runtime: 'nodejs' };
+
 // Public endpoint? Or auth protected? 
 // storage.js implementation of `getEnrolledCount` does NOT pass token.
 // So this one remains public or we need to fix storage.js to pass token.

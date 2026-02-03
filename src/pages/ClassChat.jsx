@@ -6,6 +6,7 @@ import { sendMessageToAI } from '../utils/openai'
 import ReactMarkdown from 'react-markdown'
 
 import remarkMath from 'remark-math'
+import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 
@@ -275,7 +276,7 @@ function ClassChat() {
                   >
                     {isAssistant ? (
                       <ReactMarkdown
-                        remarkPlugins={[remarkMath]}
+                        remarkPlugins={[remarkMath, remarkGfm]}
                         rehypePlugins={[rehypeKatex]}
                         components={{
                           h3: ({ node, ...props }) => {
@@ -317,7 +318,110 @@ function ClassChat() {
                           p: ({ node, ...props }) => <p style={{ marginBottom: '16px' }} {...props} />,
                           ul: ({ node, ...props }) => <ul style={{ marginBottom: '16px', paddingLeft: '20px', listStyleType: 'disc' }} {...props} />,
                           li: ({ node, ...props }) => <li style={{ marginBottom: '8px' }} {...props} />,
-                          strong: ({ node, ...props }) => <strong style={{ color: '#0F172A', fontWeight: 800 }} {...props} />
+                          strong: ({ node, ...props }) => <strong style={{ color: '#0F172A', fontWeight: 800 }} {...props} />,
+                          blockquote: ({ node, ...props }) => (
+                            <blockquote
+                              style={{
+                                borderLeft: '3px solid #CBD5F5',
+                                paddingLeft: '12px',
+                                color: '#475569',
+                                margin: '12px 0'
+                              }}
+                              {...props}
+                            />
+                          ),
+                          code: ({ inline, className, children, ...props }) => {
+                            const lang = /language-([\w-]+)/.exec(className || '')?.[1]
+                            if (inline) {
+                              return (
+                                <code
+                                  style={{
+                                    background: '#F1F5F9',
+                                    padding: '2px 6px',
+                                    borderRadius: '6px',
+                                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                    fontSize: '0.9em'
+                                  }}
+                                  {...props}
+                                >
+                                  {children}
+                                </code>
+                              )
+                            }
+                            return (
+                              <pre
+                                style={{
+                                  background: '#0F172A',
+                                  color: '#E2E8F0',
+                                  padding: '14px 16px',
+                                  borderRadius: '10px',
+                                  overflowX: 'auto',
+                                  margin: '12px 0',
+                                  position: 'relative'
+                                }}
+                              >
+                                {lang && (
+                                  <span style={{
+                                    position: 'absolute',
+                                    top: '8px',
+                                    right: '10px',
+                                    fontSize: '11px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.06em',
+                                    color: '#94A3B8'
+                                  }}>
+                                    {lang}
+                                  </span>
+                                )}
+                                <code
+                                  className={className}
+                                  style={{
+                                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                    fontSize: '0.9em',
+                                    lineHeight: '1.6',
+                                    whiteSpace: 'pre'
+                                  }}
+                                  {...props}
+                                >
+                                  {children}
+                                </code>
+                              </pre>
+                            )
+                          },
+                          table: ({ node, ...props }) => (
+                            <table
+                              style={{
+                                width: '100%',
+                                borderCollapse: 'collapse',
+                                margin: '12px 0',
+                                fontSize: '14px'
+                              }}
+                              {...props}
+                            />
+                          ),
+                          th: ({ node, ...props }) => (
+                            <th
+                              style={{
+                                textAlign: 'left',
+                                padding: '8px 10px',
+                                borderBottom: '1px solid #E2E8F0',
+                                background: '#F8FAFC'
+                              }}
+                              {...props}
+                            />
+                          ),
+                          td: ({ node, ...props }) => (
+                            <td
+                              style={{
+                                padding: '8px 10px',
+                                borderBottom: '1px solid #E2E8F0'
+                              }}
+                              {...props}
+                            />
+                          ),
+                          a: ({ node, ...props }) => (
+                            <a style={{ color: '#2563EB', textDecoration: 'underline' }} target="_blank" rel="noreferrer" {...props} />
+                          )
                         }}
                       >
                         {message.content}

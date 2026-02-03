@@ -71,6 +71,48 @@ function Teacher() {
     return cleaned.slice(0, maxChars) + '…'
   }
 
+  const summarizeText = (text, maxChars = 1200) => {
+    const raw = String(text || '').replace(/\s+/g, ' ').trim()
+    if (!raw) return ''
+    if (raw.length <= maxChars) return raw
+
+    const stop = new Set([
+      'the','a','an','and','or','but','if','then','else','when','where','what','why','how','who',
+      'is','are','was','were','be','been','being','do','does','did',
+      'i','me','my','mine','you','your','yours','we','our','they','their',
+      'to','of','in','on','at','for','with','about','as','by','from','into','over','under',
+      'this','that','these','those','it','its','can','could','should','would','will','just'
+    ])
+
+    const words = raw
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !stop.has(w))
+
+    const freq = new Map()
+    for (const w of words) {
+      freq.set(w, (freq.get(w) || 0) + 1)
+    }
+
+    const sentences = raw.split(/(?<=[.!?])\s+/)
+    const scored = sentences.map((s, idx) => {
+      const n = s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ')
+      let score = 0
+      for (const w of n.split(/\s+/)) {
+        if (!w || stop.has(w)) continue
+        score += freq.get(w) || 0
+      }
+      return { idx, s: s.trim(), score }
+    }).filter(x => x.s.length > 0)
+
+    scored.sort((a, b) => b.score - a.score)
+    const picked = scored.slice(0, Math.min(8, scored.length)).sort((a, b) => a.idx - b.idx)
+    const bullets = picked.map(p => `• ${p.s}`)
+    const summary = bullets.join('\n')
+    return summary.length <= maxChars ? summary : summary.slice(0, maxChars) + '…'
+  }
+
   const extractTextFromPdf = async (file) => {
     ensurePdfWorker()
     const buffer = await file.arrayBuffer()
@@ -83,10 +125,20 @@ function Teacher() {
     for (let i = 1; i <= maxPages; i += 1) {
       const page = await pdf.getPage(i)
       const textContent = await page.getTextContent()
-      const pageText = (textContent.items || [])
-        .map(item => (item && typeof item.str === 'string') ? item.str : '')
-        .join(' ')
-        .replace(/\s+/g, ' ')
+      const items = (textContent.items || []).filter(item => item && typeof item.str === 'string')
+      const lines = new Map()
+      for (const item of items) {
+        const y = Math.round(item.transform?.[5] || 0)
+        const line = lines.get(y) || []
+        line.push(item.str)
+        lines.set(y, line)
+      }
+      const pageText = Array.from(lines.entries())
+        .sort((a, b) => b[0] - a[0])
+        .map(([, line]) => line.join(' '))
+        .join('\n')
+        .replace(/\s+\n/g, '\n')
+        .replace(/[ \t]+/g, ' ')
         .trim()
       if (pageText) {
         const trimmed = compressText(pageText, LIMITS.MAX_PAGE_CHARS)
@@ -98,13 +150,15 @@ function Teacher() {
     if (!fullText.trim()) {
       return {
         text: '[PDF EXTRACTION WARNING: 0 characters extracted]',
-        pageMetadata: []
+        pageMetadata: [],
+        summary: ''
       }
     }
 
     return {
       text: compressText(fullText, LIMITS.MAX_FILE_CHARS),
-      pageMetadata
+      pageMetadata,
+      summary: summarizeText(fullText)
     }
   }
 
@@ -123,7 +177,12 @@ function Teacher() {
     if (name.endsWith('.docx')) {
       const buffer = await file.arrayBuffer()
       const result = await mammoth.extractRawText({ arrayBuffer: buffer })
-      return { text: compressText(result?.value || '', LIMITS.MAX_FILE_CHARS), pageMetadata: null }
+      const raw = result?.value || ''
+      return {
+        text: compressText(raw, LIMITS.MAX_FILE_CHARS),
+        pageMetadata: null,
+        summary: summarizeText(raw)
+      }
     }
 
     if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
@@ -131,25 +190,45 @@ function Teacher() {
       const workbook = XLSX.read(buffer, { type: 'array' })
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
       const csv = XLSX.utils.sheet_to_csv(firstSheet)
-      return { text: compressText(csv, LIMITS.MAX_FILE_CHARS), pageMetadata: null }
+      return {
+        text: compressText(csv, LIMITS.MAX_FILE_CHARS),
+        pageMetadata: null,
+        summary: summarizeText(csv)
+      }
     }
 
     if (/\.(txt|md|html|htm|json|rtf|ppt|pptx)$/i.test(name) || type.startsWith('text/')) {
       const text = await file.text()
-      return { text: compressText(text, LIMITS.MAX_FILE_CHARS), pageMetadata: null }
+      return {
+        text: compressText(text, LIMITS.MAX_FILE_CHARS),
+        pageMetadata: null,
+        summary: summarizeText(text)
+      }
     }
 
     if (type.startsWith('image/')) {
       const ocr = await ocrImageToNotes(file)
       const combined = [ocr?.summary, ocr?.raw_text].filter(Boolean).join('\n')
-      return { text: compressText(combined || `Image file (${file.name})`, LIMITS.MAX_FILE_CHARS), pageMetadata: null }
+      return {
+        text: compressText(combined || `Image file (${file.name})`, LIMITS.MAX_FILE_CHARS),
+        pageMetadata: null,
+        summary: ocr?.summary || summarizeText(combined)
+      }
     }
 
     try {
       const text = await file.text()
-      return { text: compressText(text, LIMITS.MAX_FILE_CHARS), pageMetadata: null }
+      return {
+        text: compressText(text, LIMITS.MAX_FILE_CHARS),
+        pageMetadata: null,
+        summary: summarizeText(text)
+      }
     } catch {
-      return { text: `Uploaded file: ${file.name}. Content could not be extracted.`, pageMetadata: null }
+      return {
+        text: `Uploaded file: ${file.name}. Content could not be extracted.`,
+        pageMetadata: null,
+        summary: ''
+      }
     }
   }
 
@@ -212,7 +291,7 @@ function Teacher() {
     setIsUploading(true)
 
     for (const file of files) {
-      const { text, pageMetadata, error } = await extractTextFromFile(file)
+      const { text, pageMetadata, summary, error } = await extractTextFromFile(file)
       if (error) {
         setUploadError(error)
         continue
@@ -223,7 +302,8 @@ function Teacher() {
         type: file.type || 'application/octet-stream',
         size: file.size,
         content: text || '',
-        pageMetadata
+        pageMetadata,
+        summary: summary || ''
       })
     }
 

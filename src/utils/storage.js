@@ -4,7 +4,8 @@ const LIMITS = {
   CLASS_NAME_MAX: 80,
   SUBJECT_MAX: 80,
   MAX_MATERIALS_CHARS_SENT: 6500,
-  MAX_LOCAL_CHUNKS: 10
+  MAX_LOCAL_CHUNKS: 10,
+  MAX_CHUNK_CHARS: 800
 }
 
 const STORAGE_KEYS = {
@@ -157,6 +158,7 @@ export function createMaterial(classCode, userId, material) {
     type: material?.type || 'application/octet-stream',
     size: material?.size || 0,
     content: material?.content || '',
+    summary: material?.summary || '',
     pageMetadata: material?.pageMetadata || null,
     createdAt: new Date().toISOString()
   }
@@ -189,6 +191,7 @@ export function upsertClassNotes(classCode, text) {
     type: 'text/notes',
     size: text.length,
     content: text,
+    summary: text.slice(0, 1200),
     pageMetadata: null,
     createdAt: new Date().toISOString()
   }
@@ -301,6 +304,13 @@ export function getRelevantChunks(userMessage, classCode) {
   const chunks = []
 
   for (const mat of materials) {
+    if (mat.summary) {
+      chunks.push({
+        text: `Summary: ${mat.summary}`,
+        materialName: mat.name,
+        pageNumber: mat.pageNumber
+      })
+    }
     if (Array.isArray(mat.pageMetadata) && mat.pageMetadata.length > 0) {
       for (const page of mat.pageMetadata) {
         if (!page?.text) continue
@@ -320,15 +330,17 @@ export function getRelevantChunks(userMessage, classCode) {
   }
 
   const scored = scoreChunks(userMessage, chunks)
-  if (!scored.length) return []
+  const fallback = chunks.filter(c => String(c.text || '').trim().length > 0)
+  const ranked = scored.length ? scored : fallback
 
   const limited = []
   let totalChars = 0
 
-  for (const item of scored) {
+  for (const item of ranked) {
     if (limited.length >= LIMITS.MAX_LOCAL_CHUNKS) break
-    const text = String(item.text || '').trim()
-    if (!text) continue
+    const raw = String(item.text || '').trim()
+    if (!raw) continue
+    const text = raw.length > LIMITS.MAX_CHUNK_CHARS ? raw.slice(0, LIMITS.MAX_CHUNK_CHARS) + '…' : raw
     if (totalChars + text.length > LIMITS.MAX_MATERIALS_CHARS_SENT) break
     limited.push({ text, materialName: item.materialName, pageNumber: item.pageNumber })
     totalChars += text.length

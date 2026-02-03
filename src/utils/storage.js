@@ -82,22 +82,30 @@ export async function createClass(token, className, subject = '') {
     })
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.error || 'Failed to create class')
+    const errJson = await res.json().catch(() => ({}))
+    const errText = await res.text().catch(() => '')
+    const msg = errJson?.error || errText || 'Failed to create class'
+    throw new Error(msg)
   }
   return res.json()
 }
 
 export async function getTeacherClasses(token) {
   const res = await authedFetch(token, '/api/classes/teacher', { method: 'GET' })
-  if (!res.ok) return []
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(errText || 'Failed to load teacher classes')
+  }
   return res.json()
 }
 
 export async function getClassByCode(token, code) {
   const normalized = normalizeCode(code)
   const res = await authedFetch(token, `/api/classes/by-code?code=${encodeURIComponent(normalized)}`, { method: 'GET' })
-  if (!res.ok) return null
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(errText || 'Failed to load class')
+  }
   return res.json()
 }
 
@@ -107,13 +115,19 @@ export async function joinClass(token, classCode) {
     method: 'POST',
     body: JSON.stringify({ code })
   })
-  if (!res.ok) return false
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(errText || 'Failed to join class')
+  }
   return true
 }
 
 export async function getStudentClasses(token) {
   const res = await authedFetch(token, '/api/classes/student', { method: 'GET' })
-  if (!res.ok) return []
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(errText || 'Failed to load student classes')
+  }
   return res.json()
 }
 

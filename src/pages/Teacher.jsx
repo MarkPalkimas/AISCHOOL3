@@ -5,6 +5,7 @@ import UserMenu from '../components/UserMenu'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { ocrImageToNotes } from '../utils/ocr'
 import {
   getTeacherClasses,
   createClass,
@@ -139,7 +140,9 @@ function Teacher() {
     }
 
     if (type.startsWith('image/')) {
-      return { text: `Image file (${file.name}). No OCR available in-browser.`, pageMetadata: null }
+      const ocr = await ocrImageToNotes(file)
+      const combined = [ocr?.summary, ocr?.raw_text].filter(Boolean).join('\n')
+      return { text: compressText(combined || `Image file (${file.name})`, LIMITS.MAX_FILE_CHARS), pageMetadata: null }
     }
 
     try {

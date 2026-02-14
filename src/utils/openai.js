@@ -282,11 +282,19 @@ ${userMessage}
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error('Proxy/OpenAI Error:', errorData)
       if (response.status === 401) throw new Error('Invalid OpenAI API key configuration.')
       if (response.status === 429) throw new Error('Rate limit exceeded. Please try again in a moment.')
-      throw new Error(errorData.error || 'Failed to get response from AI')
+      if (response.status === 409) throw new Error('Materials still processing.')
+
+      const errorText = await response.text().catch(() => '')
+      let errorData = {}
+      try {
+        errorData = errorText ? JSON.parse(errorText) : {}
+      } catch {
+        errorData = {}
+      }
+      console.error('Proxy/OpenAI Error:', errorData)
+      throw new Error(errorData.error || errorText || 'Failed to get response from AI')
     }
 
     const data = await response.json()

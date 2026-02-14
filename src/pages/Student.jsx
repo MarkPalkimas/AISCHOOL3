@@ -75,14 +75,14 @@ function Student() {
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
             <img 
               src="/Logo.jpg" 
-              alt="ClassAI Logo" 
+              alt="StudyGuide AI Logo" 
               style={{ 
                 width: '32px', 
                 height: '32px', 
                 objectFit: 'contain'
               }} 
             />
-            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
+            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>StudyGuide AI</span>
           </Link>
           
           <UserMenu />

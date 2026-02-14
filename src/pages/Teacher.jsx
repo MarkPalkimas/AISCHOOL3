@@ -360,8 +360,8 @@ function Teacher() {
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            <img src="/Logo.jpg" alt="ClassAI Logo" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
-            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
+            <img src="/Logo.jpg" alt="StudyGuide AI Logo" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>StudyGuide AI</span>
           </Link>
           <UserMenu />
         </div>

@@ -53,10 +53,10 @@ function HomePage() {
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
             <img
               src="/Logo.jpg"
-              alt="ClassAI Logo"
+              alt="StudyGuide AI Logo"
               style={{ width: '64px', height: '64px', objectFit: 'contain' }}
             />
-            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
+            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>StudyGuide AI</span>
           </Link>
 
           <div>
@@ -141,13 +141,13 @@ function HomePage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
             <img
               src="/Logo.jpg"
-              alt="ClassAI Logo"
+              alt="StudyGuide AI Logo"
               style={{ width: '24px', height: '24px', objectFit: 'contain' }}
             />
-            <span style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>ClassAI</span>
+            <span style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>StudyGuide AI</span>
           </div>
           <p style={{ color: '#6B7280', fontSize: '14px' }}>
-            © 2024 ClassAI. Empowering education through AI.
+            © 2024 StudyGuide AI. Empowering education through AI.
           </p>
         </div>
       </footer>
@@ -280,10 +280,10 @@ function AccessDenied() {
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
             <img
               src="/Logo.jpg"
-              alt="ClassAI Logo"
+              alt="StudyGuide AI Logo"
               style={{ width: '32px', height: '32px', objectFit: 'contain' }}
             />
-            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>ClassAI</span>
+            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>StudyGuide AI</span>
           </Link>
           <SignedIn>
             <UserMenu />

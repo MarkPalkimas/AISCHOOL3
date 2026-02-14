@@ -1,5 +1,5 @@
 //api/chat.js
-import { callWithOpenAIRetry, getUserKey, guardAiRequest } from '../lib/aiGuard.ts'
+import { callWithOpenAIRetry, getUserKey, guardAiRequest } from '../lib/aiGuard.js'
 
 export const config = {
   runtime: 'edge',

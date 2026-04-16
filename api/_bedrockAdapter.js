@@ -3,6 +3,34 @@ import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-r
 import { buildStructuredUserTurn, SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from './_openaiAdapter.js'
 
 const DEFAULT_MODEL_ID = 'anthropic.claude-3-haiku-20240307-v1:0'
+let loggedConfig = false
+
+function readEnv(name) {
+  return String(process.env[name] || '').trim()
+}
+
+function getCredentialMode(accessKeyId) {
+  if (accessKeyId.startsWith('ASIA')) return 'temporary'
+  if (accessKeyId.startsWith('AKIA')) return 'long_lived'
+  return 'unknown'
+}
+
+function logBedrockConfigOnce({ accessKeyId, secretAccessKey, sessionToken, region, modelId }) {
+  if (loggedConfig) return
+  loggedConfig = true
+
+  console.info(JSON.stringify({
+    event: 'bedrock_runtime_config',
+    provider: String(process.env.AI_PROVIDER || 'openai').trim().toLowerCase(),
+    region,
+    modelId,
+    hasAccessKeyId: Boolean(accessKeyId),
+    accessKeyPrefix: accessKeyId.slice(0, 4),
+    credentialMode: getCredentialMode(accessKeyId),
+    hasSecretAccessKey: Boolean(secretAccessKey),
+    hasSessionToken: Boolean(sessionToken),
+  }))
+}
 
 /**
  * Calls the AWS Bedrock Converse API and returns the assistant reply as a string.
@@ -16,26 +44,27 @@ const DEFAULT_MODEL_ID = 'anthropic.claude-3-haiku-20240307-v1:0'
  */
 export async function complete({ systemPrompt, context, history = [], userMessage }) {
   // Read and trim credentials to guard against accidental whitespace/newlines pasted into Vercel
-  const accessKeyId     = (process.env.AWS_ACCESS_KEY_ID     || '').trim()
-  const secretAccessKey = (process.env.AWS_SECRET_ACCESS_KEY || '').trim()
-  const sessionToken    = (process.env.AWS_SESSION_TOKEN     || '').trim() || undefined
-  const region          = (process.env.AWS_REGION            || '').trim()
-  const modelId         = (process.env.BEDROCK_MODEL_ID      || DEFAULT_MODEL_ID).trim()
+  const accessKeyId     = readEnv('AWS_ACCESS_KEY_ID')
+  const secretAccessKey = readEnv('AWS_SECRET_ACCESS_KEY')
+  const sessionToken    = readEnv('AWS_SESSION_TOKEN') || undefined
+  const region          = readEnv('AWS_REGION')
+  const modelId         = readEnv('BEDROCK_MODEL_ID') || DEFAULT_MODEL_ID
+
+  logBedrockConfigOnce({ accessKeyId, secretAccessKey, sessionToken, region, modelId })
 
   // Validation
   if (!accessKeyId)     throw new Error('Bedrock config error: missing AWS_ACCESS_KEY_ID')
   if (!secretAccessKey) throw new Error('Bedrock config error: missing AWS_SECRET_ACCESS_KEY')
   if (!region)          throw new Error('Bedrock config error: missing AWS_REGION')
-
-  // Safe diagnostic logging — never logs secrets
-  console.info(JSON.stringify({
-    event:          'bedrock_init',
-    provider:       'bedrock',
-    region,
-    modelId,
-    hasSessionToken: !!sessionToken,
-    accessKeyPrefix: accessKeyId.slice(0, 4),
-  }))
+  if (accessKeyId.startsWith('ASIA') && !sessionToken) {
+    throw new Error('Bedrock config error: AWS_SESSION_TOKEN is required for temporary AWS credentials')
+  }
+  if (accessKeyId.startsWith('AKIA') && accessKeyId.length !== 20) {
+    throw new Error('Bedrock config error: AWS_ACCESS_KEY_ID has an unexpected length after trimming')
+  }
+  if (secretAccessKey.length !== 40) {
+    throw new Error('Bedrock config error: AWS_SECRET_ACCESS_KEY has an unexpected length after trimming')
+  }
 
   // Build the Bedrock Converse messages array
   const resolvedSystemPrompt = String(systemPrompt || DEFAULT_SYSTEM_PROMPT || '').trim()

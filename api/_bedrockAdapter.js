@@ -32,6 +32,33 @@ function logBedrockConfigOnce({ accessKeyId, secretAccessKey, sessionToken, regi
   }))
 }
 
+function describeBedrockError(err, { region, modelId }) {
+  const name = String(err?.name || '')
+  const message = String(err?.message || err || '')
+  const status = err?.$metadata?.httpStatusCode
+  const requestId = err?.$metadata?.requestId
+
+  console.error(JSON.stringify({
+    event: 'bedrock_runtime_error',
+    name,
+    message,
+    status,
+    requestId,
+    region,
+    modelId,
+  }))
+
+  if (name === 'ValidationException' && /operation not allowed/i.test(message)) {
+    return [
+      'Bedrock model access is not enabled for this AWS account, region, or model.',
+      `AWS rejected ${modelId} in ${region} with: Operation not allowed.`,
+      'Enable Bedrock model access for this model and confirm the IAM principal can invoke it.',
+    ].join(' ')
+  }
+
+  return message || 'Unknown Bedrock SDK error'
+}
+
 /**
  * Calls the AWS Bedrock Converse API and returns the assistant reply as a string.
  *
@@ -102,7 +129,7 @@ export async function complete({ systemPrompt, context, history = [], userMessag
     response = await client.send(new ConverseCommand(commandInput))
   } catch (err) {
     // Surface the AWS error message clearly in Vercel logs
-    throw new Error(`Bedrock SDK error: ${err?.message || String(err)}`)
+    throw new Error(`Bedrock SDK error: ${describeBedrockError(err, { region, modelId })}`)
   }
 
   const content = Array.isArray(response?.output?.message?.content)

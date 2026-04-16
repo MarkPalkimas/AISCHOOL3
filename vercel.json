@@ -5,6 +5,14 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/chat-history",
+      "destination": "/api/chat"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/set-role"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

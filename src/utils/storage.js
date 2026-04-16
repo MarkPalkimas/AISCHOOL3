@@ -123,6 +123,34 @@ export async function joinClass(token, classCode) {
   return true
 }
 
+export async function leaveClass(token, classCode) {
+  const code = normalizeCode(classCode)
+  const res = await authedFetch(token, '/api/classes/leave', {
+    method: 'POST',
+    body: JSON.stringify({ code })
+  })
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(errText || 'Failed to leave class')
+  }
+  clearClassMaterialsCache(code)
+  return true
+}
+
+export async function deleteClass(token, classCode) {
+  const code = normalizeCode(classCode)
+  const res = await authedFetch(token, '/api/classes/delete', {
+    method: 'POST',
+    body: JSON.stringify({ code })
+  })
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(errText || 'Failed to delete class')
+  }
+  clearClassMaterialsCache(code)
+  return true
+}
+
 export async function getStudentClasses(token) {
   const res = await authedFetch(token, '/api/classes/student', { method: 'GET' })
   if (!res.ok) {
@@ -172,6 +200,12 @@ export function createMaterial(classCode, userId, material) {
 export function getClassMaterials(classCode) {
   const code = normalizeCode(classCode)
   return getAllMaterials().filter(m => normalizeCode(m.classCode) === code)
+}
+
+export function clearClassMaterialsCache(classCode) {
+  const code = normalizeCode(classCode)
+  const next = getAllMaterials().filter((material) => normalizeCode(material.classCode) !== code)
+  setAllMaterials(next)
 }
 
 export function deleteMaterial(materialId) {

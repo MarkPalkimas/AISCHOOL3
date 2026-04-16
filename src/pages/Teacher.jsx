@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useUser, useAuth } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
+import AppModal from '../components/AppModal'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
@@ -9,6 +10,7 @@ import { ocrImageToNotes } from '../utils/ocr'
 import {
   getTeacherClasses,
   createClass,
+  deleteClass,
   updateClassMaterials,
   createMaterial,
   getClassMaterials,
@@ -28,9 +30,14 @@ function Teacher() {
   const [newClassSubject, setNewClassSubject] = useState('')
   const [notes, setNotes] = useState('')
   const [classMaterials, setClassMaterials] = useState([])
+  const [createError, setCreateError] = useState('')
   const [uploadError, setUploadError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isLoadingMaterials, setIsLoadingMaterials] = useState(false)
+  const [isDeletingClass, setIsDeletingClass] = useState(false)
+  const [pendingDeleteClass, setPendingDeleteClass] = useState(null)
   const fileInputRef = useRef(null)
 
   const LIMITS = {
@@ -47,7 +54,7 @@ function Teacher() {
       setClasses(teacherClasses || [])
     }
     load()
-  }, [user])
+  }, [getToken, user])
 
   const ensurePdfWorker = () => {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -258,398 +265,577 @@ function Teacher() {
     }
   }
 
-  const handleCreateClass = async (e) => {
-    e.preventDefault()
-    if (!newClassName.trim() || !user) return
-    setIsCreating(true)
-    await new Promise(r => setTimeout(r, 500))
-    const token = await getToken()
-    const newClass = await createClass(token, newClassName, newClassSubject)
-    setClasses([...classes, newClass].filter(Boolean))
-    setNewClassName('')
-    setNewClassSubject('')
-    setShowCreateModal(false)
-    setIsCreating(false)
+  const openCreateModal = () => {
+    setCreateError('')
+    setShowCreateModal(true)
   }
 
-  const handleUploadMaterials = async (e) => {
-    e.preventDefault()
-    if (!selectedClass) return
-    setIsUploading(true)
-    await new Promise(r => setTimeout(r, 500))
-    if (notes.trim()) updateClassMaterials(selectedClass.code, notes)
-    const token = await getToken()
-    await saveClassMaterials(token, selectedClass.code)
-    const updatedClasses = await getTeacherClasses(token)
-    setClasses(updatedClasses || [])
+  const resetCreateModal = () => {
+    setShowCreateModal(false)
+    setCreateError('')
+    setNewClassName('')
+    setNewClassSubject('')
+  }
+
+  const closeCreateModal = () => {
+    if (isCreating) return
+    resetCreateModal()
+  }
+
+  const resetUploadModal = () => {
     setShowUploadModal(false)
     setSelectedClass(null)
     setNotes('')
     setClassMaterials([])
-    setIsUploading(false)
+    setUploadError('')
   }
 
-  const openUploadModal = (classItem) => {
-    const open = async () => {
-      setSelectedClass(classItem)
+  const closeUploadModal = () => {
+    if (isUploading || isLoadingMaterials || isDeletingClass) return
+    resetUploadModal()
+  }
+
+  const handleCreateClass = async (event) => {
+    event.preventDefault()
+    if (!newClassName.trim() || !user) return
+
+    setIsCreating(true)
+    setCreateError('')
+
+    try {
+      const token = await getToken()
+      const newClass = await createClass(token, newClassName, newClassSubject)
+      setClasses((current) => [...current, newClass].filter(Boolean))
+      resetCreateModal()
+    } catch (error) {
+      setCreateError(error?.message || 'Unable to create this class right now.')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const handleUploadMaterials = async (event) => {
+    event.preventDefault()
+    if (!selectedClass) return
+
+    setIsUploading(true)
+    setUploadError('')
+
+    try {
+      if (notes.trim()) updateClassMaterials(selectedClass.code, notes)
+      const token = await getToken()
+      await saveClassMaterials(token, selectedClass.code)
+      const updatedClasses = await getTeacherClasses(token)
+      setClasses(updatedClasses || [])
+      resetUploadModal()
+    } catch (error) {
+      setUploadError(error?.message || 'Unable to save class materials.')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const openUploadModal = async (classItem) => {
+    setSelectedClass(classItem)
+    setNotes('')
+    setClassMaterials([])
+    setUploadError('')
+    setShowUploadModal(true)
+    setIsLoadingMaterials(true)
+
+    try {
       const token = await getToken()
       await syncClassMaterials(token, classItem.code)
-      const mats = getClassMaterials(classItem.code)
-      const notesMat = mats.find(m => m.id === `notes_${classItem.code}` || m.type === 'text/notes')
-      setNotes(notesMat?.content || '')
-      setClassMaterials(mats)
-      setUploadError('')
-      setShowUploadModal(true)
+      const materials = getClassMaterials(classItem.code)
+      const notesMaterial = materials.find((material) => material.id === `notes_${classItem.code}` || material.type === 'text/notes')
+
+      setNotes(notesMaterial?.content || '')
+      setClassMaterials(materials)
+    } catch (error) {
+      setUploadError(error?.message || 'Unable to load existing class materials.')
+    } finally {
+      setIsLoadingMaterials(false)
     }
-    open()
   }
 
   const handleChooseFiles = () => {
     fileInputRef.current?.click()
   }
 
-  const handleFilesSelected = async (e) => {
-    const files = Array.from(e.target.files || [])
-    e.target.value = ''
+  const handleFilesSelected = async (event) => {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
     if (!selectedClass || files.length === 0) return
 
     setUploadError('')
     setIsUploading(true)
 
-    for (const file of files) {
-      const { text, pageMetadata, summary, status, errorMessage, error } = await extractTextFromFile(file)
-      if (error) {
-        setUploadError(error)
-        continue
+    try {
+      for (const file of files) {
+        const { text, pageMetadata, summary, status, errorMessage, error } = await extractTextFromFile(file)
+        if (error) {
+          setUploadError(error)
+          continue
+        }
+
+        createMaterial(selectedClass.code, user?.id, {
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          content: text || '',
+          pageMetadata,
+          summary: summary || '',
+          status: status || 'ok',
+          errorMessage: errorMessage || ''
+        })
       }
 
-      createMaterial(selectedClass.code, user?.id, {
-        name: file.name,
-        type: file.type || 'application/octet-stream',
-        size: file.size,
-        content: text || '',
-        pageMetadata,
-        summary: summary || '',
-        status: status || 'ok',
-        errorMessage: errorMessage || ''
-      })
-    }
-
-    setClassMaterials(getClassMaterials(selectedClass.code))
-    const token = await getToken()
-    await saveClassMaterials(token, selectedClass.code)
-    setIsUploading(false)
-  }
-
-  const handleDeleteMaterial = (materialId) => {
-    deleteMaterial(materialId)
-    if (selectedClass) {
       setClassMaterials(getClassMaterials(selectedClass.code))
-    }
-    const sync = async () => {
-      if (!selectedClass) return
       const token = await getToken()
       await saveClassMaterials(token, selectedClass.code)
+    } catch (error) {
+      setUploadError(error?.message || 'Unable to process these files.')
+    } finally {
+      setIsUploading(false)
     }
-    sync()
   }
 
+  const handleDeleteMaterial = async (materialId) => {
+    deleteMaterial(materialId)
+
+    if (!selectedClass) return
+
+    setClassMaterials(getClassMaterials(selectedClass.code))
+
+    try {
+      const token = await getToken()
+      await saveClassMaterials(token, selectedClass.code)
+    } catch (error) {
+      setUploadError(error?.message || 'Unable to remove this material right now.')
+    }
+  }
+
+  const handleDeleteClass = async () => {
+    if (!pendingDeleteClass) return
+
+    setIsDeletingClass(true)
+    setDeleteError('')
+
+    try {
+      const token = await getToken()
+      await deleteClass(token, pendingDeleteClass.code)
+      setClasses((current) => current.filter((classItem) => classItem.code !== pendingDeleteClass.code))
+      setPendingDeleteClass(null)
+      resetUploadModal()
+    } catch (error) {
+      setDeleteError(error?.message || 'Unable to delete this class right now.')
+    } finally {
+      setIsDeletingClass(false)
+    }
+  }
+
+  const totalMaterials = classes.reduce((sum, classItem) => {
+    const serverCount = Array.isArray(classItem.materials) ? classItem.materials.length : 0
+    const localCount = getClassMaterials(classItem.code).length
+    return sum + (serverCount || localCount)
+  }, 0)
+
   return (
-    <div style={{ minHeight: '100vh', background: 'white' }}>
-      {/* Navigation */}
-      <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '16px 0' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            <img src="/Logo.jpg" alt="StudyGuide AI Logo" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
-            <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>StudyGuide AI</span>
+    <div className="workspace-shell">
+      <aside className="workspace-sidebar">
+        <div className="workspace-brand">
+          <Link to="/" className="workspace-brand__link">
+            <img src="/Logo.jpg" alt="StudyGuide AI Logo" className="workspace-brand__logo" />
+            <div>
+              <span className="workspace-brand__title">StudyGuide AI</span>
+              <span className="workspace-brand__subtitle">Teacher Workspace</span>
+            </div>
           </Link>
           <UserMenu />
         </div>
-      </nav>
 
-      {/* Main Content */}
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '80px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '32px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>My Classes</h1>
-            <p style={{ color: '#6B7280' }}>Manage your classes and AI assistants</p>
-          </div>
-          <button onClick={() => setShowCreateModal(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="workspace-sidebar__section">
+          <p className="workspace-sidebar__eyebrow">Create</p>
+          <button type="button" onClick={openCreateModal} className="btn-primary workspace-button-full">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Create New Class
+            New Class
           </button>
+          <div className="workspace-summary-list">
+            <div className="workspace-summary-item">
+              <span>Classes</span>
+              <strong>{classes.length}</strong>
+            </div>
+            <div className="workspace-summary-item">
+              <span>Materials</span>
+              <strong>{totalMaterials}</strong>
+            </div>
+          </div>
         </div>
 
-        {classes.length === 0 ? (
-          <div className="feature-card" style={{ textAlign: 'center', padding: '64px 32px' }}>
-            <div style={{ width: '64px', height: '64px', background: '#F3F4F6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-              <svg style={{ width: '32px', height: '32px', color: '#9CA3AF' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
+        <div className="workspace-sidebar__section workspace-sidebar__section--grow">
+          <div className="workspace-sidebar__section-header">
+            <div>
+              <p className="workspace-sidebar__eyebrow">Library</p>
+              <h2>Your classes</h2>
             </div>
-            <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '24px' }}>No classes yet</h3>
-            <button onClick={() => setShowCreateModal(true)} className="btn-primary">Create Your First Class</button>
+            <span className="workspace-sidebar__count">{classes.length}</span>
           </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
-            {classes.map((classItem) => {
-              const serverCount = Array.isArray(classItem.materials) ? classItem.materials.length : 0
-              const localCount = getClassMaterials(classItem.code).length
-              const materialCount = serverCount || localCount
-              const hasMaterials = materialCount > 0
-              return (
-              <div key={classItem.code} className="feature-card" style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <svg style={{ width: '24px', height: '24px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+
+          <div className="workspace-nav-list">
+            {classes.length === 0 ? (
+              <div className="workspace-nav-empty">
+                Create a class to start building material-grounded tutors.
+              </div>
+            ) : (
+              classes.map((classItem) => {
+                const serverCount = Array.isArray(classItem.materials) ? classItem.materials.length : 0
+                const localCount = getClassMaterials(classItem.code).length
+                const materialCount = serverCount || localCount
+
+                return (
+                  <button
+                    key={classItem.code}
+                    type="button"
+                    className={`workspace-nav-item ${selectedClass?.code === classItem.code ? 'is-active' : ''}`}
+                    onClick={() => openUploadModal(classItem)}
+                  >
+                    <div className="workspace-nav-item__icon is-accent">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                       </svg>
                     </div>
-                    <span style={{ padding: '4px 12px', background: hasMaterials ? '#DEF7EC' : '#FEF3C7', color: hasMaterials ? '#059669' : '#D97706', borderRadius: '12px', fontSize: '12px', fontWeight: '600' }}>
-                      {hasMaterials ? `Active (${materialCount})` : 'Setup Needed'}
-                    </span>
-                  </div>
+                    <div className="workspace-nav-item__body">
+                      <span className="workspace-nav-item__title">{classItem.name}</span>
+                      <span className="workspace-nav-item__meta">
+                        {materialCount > 0 ? `${materialCount} materials` : 'Needs setup'}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
+      </aside>
 
-                  <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>{classItem.name}</h3>
-                  {classItem.subject && <p style={{ color: '#6B7280', fontSize: '14px', marginBottom: '16px' }}>{classItem.subject}</p>}
+      <main className="workspace-main">
+        <header className="workspace-main__header">
+          <div>
+            <p className="workspace-main__eyebrow">Teacher control center</p>
+            <h1>Manage class workspaces like a conversation product</h1>
+            <p>Create classes, upload materials, and keep every tutor workspace clean, grounded, and ready for students.</p>
+          </div>
+        </header>
 
-                  <div style={{ padding: '12px', background: '#F9FAFB', borderRadius: '8px', marginBottom: '16px' }}>
-                    <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '6px' }}>Class Code</p>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '18px', fontWeight: '700', color: '#111827', fontFamily: 'monospace' }}>{classItem.code}</span>
-                      <button
-                        onClick={() => { navigator.clipboard.writeText(classItem.code) }}
-                        style={{ padding: '4px 8px', background: 'white', border: '1px solid #D1D5DB', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', color: '#6B7280' }}
-                      >
-                        Copy
+        <section className="workspace-main__body">
+          {classes.length === 0 ? (
+            <div className="workspace-empty-state">
+              <div className="workspace-empty-state__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+              <h2>No classes yet</h2>
+              <p>Create your first class from the sidebar to start organizing materials and AI support.</p>
+              <button type="button" onClick={openCreateModal} className="btn-primary">
+                Create Your First Class
+              </button>
+            </div>
+          ) : (
+            <div className="workspace-card-grid">
+              {classes.map((classItem) => {
+                const serverCount = Array.isArray(classItem.materials) ? classItem.materials.length : 0
+                const localCount = getClassMaterials(classItem.code).length
+                const materialCount = serverCount || localCount
+                const hasMaterials = materialCount > 0
+
+                return (
+                  <div key={classItem.code} className="workspace-card">
+                    <div className="workspace-card__header">
+                      <div className="workspace-card__icon is-accent">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                      </div>
+                      <span className={`workspace-pill ${hasMaterials ? 'is-success' : 'is-warning'}`}>
+                        {hasMaterials ? `${materialCount} materials` : 'Needs setup'}
+                      </span>
+                    </div>
+
+                    <div className="workspace-card__content">
+                      <h3>{classItem.name}</h3>
+                      <p>{classItem.subject || 'Class workspace'}</p>
+                    </div>
+
+                    <div className="workspace-meta-block">
+                      <span className="workspace-meta-block__label">Class Code</span>
+                      <div className="workspace-inline-code">
+                        <span className="workspace-meta-block__value">{classItem.code}</span>
+                        <button
+                          type="button"
+                          className="workspace-inline-action"
+                          onClick={() => navigator.clipboard.writeText(classItem.code)}
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="workspace-card__actions">
+                      <button type="button" className="btn-secondary" onClick={() => openUploadModal(classItem)}>
+                        {hasMaterials ? 'Manage Materials' : 'Upload Materials'}
                       </button>
                     </div>
                   </div>
-                </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      </main>
 
-                <button onClick={() => openUploadModal(classItem)} className="btn-secondary" style={{ width: '100%' }}>
-                  {hasMaterials ? 'Manage Materials' : 'Upload Materials'}
-                </button>
-              </div>
-            )})}
-          </div>
-        )}
-      </div>
-
-      {/* Create Class Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Class</h2>
-            <form onSubmit={handleCreateClass}>
-              <div style={{ marginBottom: '20px' }}>
-                <label htmlFor="className" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
-                  Class Name *
-                </label>
-                <input
-                  type="text"
-                  id="className"
-                  value={newClassName}
-                  onChange={(e) => setNewClassName(e.target.value)}
-                  placeholder="e.g., Biology 101"
-                  style={{ width: '100%', padding: '12px 16px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '16px', boxSizing: 'border-box' }}
-                  required
-                />
+        <AppModal
+          title="Create New Class"
+          description="Set up a class workspace and generate a code you can share with students."
+          size="small"
+          onClose={closeCreateModal}
+          disableClose={isCreating}
+        >
+          <form onSubmit={handleCreateClass} className="modal-form">
+            {createError && (
+              <div className="status-banner is-error">
+                <strong>Class creation failed</strong>
+                <span>{createError}</span>
               </div>
+            )}
 
-              <div style={{ marginBottom: '24px' }}>
-                <label htmlFor="classSubject" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
-                  Subject (Optional)
-                </label>
-                <input
-                  type="text"
-                  id="classSubject"
-                  value={newClassSubject}
-                  onChange={(e) => setNewClassSubject(e.target.value)}
-                  placeholder="e.g., Life Sciences"
-                  style={{ width: '100%', padding: '12px 16px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '16px', boxSizing: 'border-box' }}
-                />
-              </div>
+            <div className="modal-field">
+              <label htmlFor="className" className="modal-label">Class Name *</label>
+              <input
+                type="text"
+                id="className"
+                value={newClassName}
+                onChange={(event) => setNewClassName(event.target.value)}
+                placeholder="e.g., Biology 101"
+                className="modal-input"
+                required
+              />
+            </div>
 
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false)
-                    setNewClassName('')
-                    setNewClassSubject('')
-                  }}
-                  className="btn-secondary"
-                  style={{ flex: 1 }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!newClassName.trim() || isCreating}
-                  className="btn-primary"
-                  style={{ 
-                    flex: 1,
-                    opacity: (!newClassName.trim() || isCreating) ? '0.5' : '1',
-                    cursor: (!newClassName.trim() || isCreating) ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {isCreating ? 'Creating...' : 'Create Class'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div className="modal-field">
+              <label htmlFor="classSubject" className="modal-label">Subject (optional)</label>
+              <input
+                type="text"
+                id="classSubject"
+                value={newClassSubject}
+                onChange={(event) => setNewClassSubject(event.target.value)}
+                placeholder="e.g., Life Sciences"
+                className="modal-input"
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                onClick={closeCreateModal}
+                className="btn-secondary"
+                disabled={isCreating}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!newClassName.trim() || isCreating}
+                className="btn-primary"
+              >
+                {isCreating ? 'Creating...' : 'Create Class'}
+              </button>
+            </div>
+          </form>
+        </AppModal>
       )}
 
-      {/* Upload Materials Modal */}
       {showUploadModal && selectedClass && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ overflowY: 'auto' }}>
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full" style={{ margin: '20px' }}>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Upload Class Materials
-            </h2>
-            <p style={{ color: '#6B7280', marginBottom: '24px' }}>
-              {selectedClass.name} - Code: <strong>{selectedClass.code}</strong>
-            </p>
-            
-            <form onSubmit={handleUploadMaterials}>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
-                  Upload Files (all types except videos)
-                </label>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button type="button" onClick={handleChooseFiles} className="btn-secondary">
-                    Add Files
-                  </button>
-                  <span style={{ fontSize: '12px', color: '#6B7280' }}>
-                    PDFs, DOCX, TXT/MD, CSV/XLSX, JSON, Images, and more
-                  </span>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  onChange={handleFilesSelected}
-                  style={{ display: 'none' }}
-                />
-                {uploadError && (
-                  <p style={{ fontSize: '12px', color: '#DC2626', marginTop: '8px' }}>{uploadError}</p>
-                )}
+        <AppModal
+          title="Manage Class Materials"
+          description={`${selectedClass.name} • Code ${selectedClass.code}`}
+          size="large"
+          onClose={closeUploadModal}
+          disableClose={isUploading || isLoadingMaterials || isDeletingClass}
+        >
+          <form onSubmit={handleUploadMaterials} className="modal-form">
+            {uploadError && (
+              <div className="status-banner is-error">
+                <strong>Materials unavailable</strong>
+                <span>{uploadError}</span>
               </div>
+            )}
 
-              <div style={{ marginBottom: '20px' }}>
-                <label htmlFor="notes" style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
-                  Teacher Notes (optional)
-                </label>
-                <textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add quick notes or a syllabus summary to guide the AI..."
-                  rows="6"
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box',
-                    fontFamily: 'inherit',
-                    resize: 'vertical'
-                  }}
-                />
-                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>
-                  We compress files to reduce token use while keeping key content searchable.
-                </p>
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
-                  Uploaded Materials
-                </label>
-                {classMaterials.length === 0 ? (
-                  <p style={{ fontSize: '13px', color: '#6B7280' }}>No materials uploaded yet.</p>
-                ) : (
-                  <div style={{ display: 'grid', gap: '8px' }}>
-                    {classMaterials.map((mat) => (
-                      <div
-                        key={mat.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '10px 12px',
-                          border: '1px solid #E5E7EB',
-                          borderRadius: '8px',
-                          background: mat.status === 'error' ? '#FEF2F2' : mat.status === 'warning' ? '#FFFBEB' : 'white'
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{mat.name}</div>
-                            {mat.status && mat.status !== 'ok' && (
-                              <span style={{
-                                padding: '2px 8px',
-                                fontSize: '11px',
-                                borderRadius: '999px',
-                                background: mat.status === 'error' ? '#FCA5A5' : '#FDE68A',
-                                color: '#7C2D12',
-                                fontWeight: 700
-                              }}>
-                                {mat.status === 'error' ? 'Unreadable' : 'Warning'}
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#6B7280' }}>{mat.type || 'file'}</div>
-                          {mat.errorMessage && (
-                            <div style={{ fontSize: '12px', color: '#B91C1C', marginTop: '4px' }}>
-                              {mat.errorMessage}
-                            </div>
-                          )}
-                        </div>
-                        <button type="button" onClick={() => handleDeleteMaterial(mat.id)} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '12px' }}>
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
+            <div className="modal-field">
+              <label className="modal-label">Upload Files</label>
+              <div className="modal-inline-row">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowUploadModal(false)
-                    setSelectedClass(null)
-                    setNotes('')
-                    setClassMaterials([])
-                  }}
+                  onClick={handleChooseFiles}
                   className="btn-secondary"
-                  style={{ flex: 1 }}
+                  disabled={isUploading || isLoadingMaterials}
                 >
-                  Cancel
+                  Add Files
                 </button>
-                <button
-                  type="submit"
-                  disabled={isUploading}
-                  className="btn-primary"
-                  style={{ 
-                    flex: 1,
-                    opacity: isUploading ? '0.5' : '1',
-                    cursor: isUploading ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {isUploading ? 'Saving...' : 'Save Materials'}
-                </button>
+                <span className="modal-helper">PDFs, DOCX, TXT, CSV/XLSX, JSON, images, and more. Video uploads stay disabled.</span>
               </div>
-            </form>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFilesSelected}
+                style={{ display: 'none' }}
+              />
+            </div>
+
+            <div className="modal-field">
+              <label htmlFor="notes" className="modal-label">Teacher Notes (optional)</label>
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Add quick notes or a syllabus summary to guide the AI..."
+                rows="5"
+                className="modal-textarea"
+              />
+              <p className="modal-helper">
+                We compress uploaded content to keep retrieval focused and token use under control.
+              </p>
+            </div>
+
+            <div className="modal-field">
+              <div className="modal-field-header">
+                <label className="modal-label">Uploaded Materials</label>
+                {isLoadingMaterials && <span className="modal-helper">Loading current materials…</span>}
+              </div>
+
+              {isLoadingMaterials ? (
+                <div className="modal-empty-state">Loading saved materials for this class…</div>
+              ) : classMaterials.length === 0 ? (
+                <div className="modal-empty-state">No materials uploaded yet.</div>
+              ) : (
+                <div className="modal-material-list">
+                  {classMaterials.map((material) => (
+                    <div
+                      key={material.id}
+                      className={`modal-material-item ${material.status === 'error' ? 'is-error' : material.status === 'warning' ? 'is-warning' : ''}`}
+                    >
+                      <div className="modal-material-item__content">
+                        <div className="modal-material-item__title-row">
+                          <span className="modal-material-item__title">{material.name}</span>
+                          {material.status && material.status !== 'ok' && (
+                            <span className="modal-status-pill">
+                              {material.status === 'error' ? 'Unreadable' : 'Warning'}
+                            </span>
+                          )}
+                        </div>
+                        <span className="modal-material-item__meta">{material.type || 'file'}</span>
+                        {material.errorMessage && (
+                          <span className="modal-material-item__error">{material.errorMessage}</span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMaterial(material.id)}
+                        className="btn-secondary"
+                        disabled={isUploading}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteError('')
+                  setPendingDeleteClass(selectedClass)
+                }}
+                className="btn-ghost-danger btn-ghost-danger--compact"
+                disabled={isUploading || isLoadingMaterials || isDeletingClass}
+              >
+                Delete Class
+              </button>
+              <button
+                type="button"
+                onClick={closeUploadModal}
+                className="btn-secondary"
+                disabled={isUploading || isLoadingMaterials || isDeletingClass}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isUploading || isLoadingMaterials || isDeletingClass}
+                className="btn-primary"
+              >
+                {isUploading ? 'Saving...' : 'Save Materials'}
+              </button>
+            </div>
+          </form>
+        </AppModal>
+      )}
+
+      {pendingDeleteClass && (
+        <AppModal
+          title="Delete Class"
+          description={`Delete ${pendingDeleteClass.name} for everyone. This cannot be undone.`}
+          size="small"
+          onClose={() => {
+            if (isDeletingClass) return
+            setPendingDeleteClass(null)
+            setDeleteError('')
+          }}
+          disableClose={isDeletingClass}
+        >
+          <div className="modal-form">
+            {deleteError && (
+              <div className="status-banner is-error">
+                <strong>Unable to delete class</strong>
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <p className="modal-helper">
+              Students will lose access, uploaded materials will be removed with the class, and related class chat history will be cleared.
+            </p>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setPendingDeleteClass(null)
+                  setDeleteError('')
+                }}
+                disabled={isDeletingClass}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-ghost-danger"
+                onClick={handleDeleteClass}
+                disabled={isDeletingClass}
+              >
+                {isDeletingClass ? 'Deleting...' : 'Delete Class'}
+              </button>
+            </div>
           </div>
-        </div>
+        </AppModal>
       )}
     </div>
   )

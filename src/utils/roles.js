@@ -6,9 +6,21 @@ export const ROLES = {
   ADMIN: 'admin'
 }
 
+export const normalizeRole = (value) => {
+  const role = String(value || '').trim().toLowerCase()
+  if (role === ROLES.STUDENT || role === ROLES.TEACHER || role === ROLES.ADMIN) {
+    return role
+  }
+  return null
+}
+
 export const getUserRole = (user) => {
   if (!user) return null
-  return user.publicMetadata?.role || null
+  return (
+    normalizeRole(user.publicMetadata?.role) ||
+    normalizeRole(user.unsafeMetadata?.role) ||
+    normalizeRole(user.role)
+  )
 }
 
 export const hasRole = (user, role) => {

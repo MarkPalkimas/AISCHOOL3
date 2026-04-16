@@ -1,20 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { useUser } from '@clerk/clerk-react'
+import { useAuth, useUser } from '@clerk/clerk-react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ROLES } from '../utils/roles'
+import { getUserRole, ROLES } from '../utils/roles'
 
 function RoleSelector() {
   const { user, isLoaded } = useUser()
+  const { getToken } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
-
-  const getRole = () => {
-    const pub = user?.publicMetadata?.role
-    const uns = user?.unsafeMetadata?.role
-    return pub || uns || null
-  }
 
   const goAfterRole = (role) => {
     if (location.state?.from) {
@@ -56,17 +51,20 @@ function RoleSelector() {
 
   useEffect(() => {
     if (!isLoaded || !user) return
-    const role = getRole()
+    const role = getUserRole(user)
     if (role) {
       goAfterRole(role)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, user])
 
-  const setRoleOnServer = async (userId, role) => {
+  const setRoleOnServer = async (token, userId, role) => {
     const res = await fetch('/api/set-role', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ userId, role }),
     })
     if (!res.ok) {
@@ -84,13 +82,20 @@ function RoleSelector() {
         throw new Error('Clerk not loaded or user missing')
       }
 
-      //1)Client-safe: store the role here first
-      await user.update({ unsafeMetadata: { role } })
+      const token = await getToken()
 
-      //2)Server-only: copy role into publicMetadata (this is what you enforce with)
-      await setRoleOnServer(user.id, role)
+      // Keep the client-visible fallback in sync while the server writes public metadata.
+      await user.update({
+        unsafeMetadata: {
+          ...(user.unsafeMetadata || {}),
+          role,
+        },
+      })
 
-      //3)Reload so publicMetadata is available immediately
+      // Persist the canonical role on the server side.
+      await setRoleOnServer(token, user.id, role)
+
+      // Reload so public metadata is available immediately.
       await user.reload()
 
       goAfterRole(role)
@@ -136,7 +141,7 @@ function RoleSelector() {
                 </svg>
               </div>
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>I'm a Student</h3>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>I&apos;m a Student</h3>
                 <p style={{ fontSize: '14px', color: '#6B7280' }}>Join classes and get help from AI tutors</p>
               </div>
             </div>
@@ -162,7 +167,7 @@ function RoleSelector() {
                 </svg>
               </div>
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>I'm a Teacher</h3>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>I&apos;m a Teacher</h3>
                 <p style={{ fontSize: '14px', color: '#6B7280' }}>Create classes and manage AI assistants</p>
               </div>
             </div>

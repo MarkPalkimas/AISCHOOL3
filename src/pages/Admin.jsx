@@ -1,16 +1,34 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useUser } from '@clerk/clerk-react'
+import { useAuth, useUser } from '@clerk/clerk-react'
 import UserMenu from '../components/UserMenu'
-import { canAccessAdminArea, ROLES } from '../utils/roles'
+import { canAccessAdminArea, getUserRole, ROLES } from '../utils/roles'
 
 function Admin() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const navigate = useNavigate()
   const [users, setUsers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+
+  const loadUsers = React.useCallback(() => {
+    setIsLoading(true)
+    const mockUsers = []
+    if (user) {
+      mockUsers.push({
+        id: user.id,
+        email: user.emailAddresses[0]?.emailAddress,
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        role: getUserRole(user) || 'none',
+        createdAt: user.createdAt
+      })
+    }
+    setUsers(mockUsers)
+    setIsLoading(false)
+  }, [user])
 
   useEffect(() => {
     if (!user) {
@@ -24,44 +42,44 @@ function Admin() {
     }
 
     loadUsers()
-  }, [user, navigate])
-
-  const loadUsers = () => {
-    setIsLoading(true)
-    const mockUsers = []
-    if (user) {
-      mockUsers.push({
-        id: user.id,
-        email: user.emailAddresses[0]?.emailAddress,
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
-        role: user.publicMetadata?.role || 'none',
-        createdAt: user.createdAt
-      })
-    }
-    setUsers(mockUsers)
-    setIsLoading(false)
-  }
+  }, [loadUsers, navigate, user])
 
   const updateUserRole = async (userId, newRole) => {
     try {
       if (userId === user.id) {
-        await user.update({
-          publicMetadata: { role: newRole }
+        const token = await getToken()
+        const res = await fetch('/api/set-role', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            userId,
+            role: newRole
+          })
         })
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => '')
+          throw new Error(text || 'Failed to update role')
+        }
+
+        await user.reload()
         loadUsers()
       } else {
         setError('Can only update your own role in this demo.')
       }
     } catch (err) {
+      console.error(err)
       setError('Failed to update role.')
     }
   }
 
   const filteredUsers = users.filter(u => 
-    u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.lastName.toLowerCase().includes(searchTerm.toLowerCase())
+    String(u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(u.firstName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(u.lastName || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   if (isLoading) {

@@ -1,5 +1,6 @@
 import { getRedis } from '../_db.js';
 import { verifyAuth } from '../_auth.js';
+import { purgeUserClassConversations } from '../_chatStore.js';
 
 export const config = { runtime: 'nodejs' };
 
@@ -32,11 +33,18 @@ export default async function handler(req, res) {
             return res.status(403).json({ error: 'Unauthorized (Not your class)' });
         }
 
-        // Delete class data
-        await redis.del(`class:${normalizedCode}`);
+        const enrolledStudents = await redis.smembers(`class:${normalizedCode}:students`);
+        const affectedUserIds = [...new Set([userId, ...(Array.isArray(enrolledStudents) ? enrolledStudents : [])])];
 
-        // Remove from teacher's list
-        await redis.srem(`teacher:${userId}:classes`, normalizedCode);
+        await Promise.all([
+            redis.del(`class:${normalizedCode}`),
+            redis.del(`class:${normalizedCode}:students`),
+            redis.srem(`teacher:${userId}:classes`, normalizedCode),
+            ...affectedUserIds.map((id) => purgeUserClassConversations({ userId: id, classCode: normalizedCode })),
+            ...(Array.isArray(enrolledStudents)
+                ? enrolledStudents.map((studentId) => redis.srem(`user:${studentId}:classes`, normalizedCode))
+                : []),
+        ]);
 
         return res.status(200).json({ success: true });
     } catch (error) {

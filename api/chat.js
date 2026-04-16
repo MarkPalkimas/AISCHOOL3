@@ -1,201 +1,170 @@
-//api/chat.js
-import { callWithOpenAIRetry, getUserKey, guardAiRequest } from '../lib/aiGuard.js'
+import { getUserKey, guardAiRequest } from '../lib/aiGuard.js'
+import { verifyAuth } from './_auth.js'
+import { getProvider } from './_aiProvider.js'
+import { appendConversationTurn, getPromptHistory, normalizeClassCode } from './_chatStore.js'
 
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs',
 }
 
-function cloneBody(value) {
-  try {
-    if (typeof structuredClone === 'function') return structuredClone(value)
-    return JSON.parse(JSON.stringify(value))
-  } catch {
-    return value
+function buildPromptUserMessage(userMessage, attachments) {
+  const text = String(userMessage || '').trim()
+  const normalizedAttachments = Array.isArray(attachments) ? attachments : []
+
+  if (normalizedAttachments.length === 0) {
+    return text
   }
+
+  const attachmentSummary = normalizedAttachments
+    .map((attachment) => {
+      const name = String(attachment?.name || 'Attachment').trim()
+      const type = String(attachment?.type || 'application/octet-stream').trim()
+      return `${name} (${type})`
+    })
+    .join(', ')
+
+  const attachmentContext = `[User attached: ${attachmentSummary}]`
+  return text ? `${text}\n\n${attachmentContext}` : attachmentContext
 }
 
-function clampTopKFields(body, clampTopK) {
-  if (!body || typeof body !== 'object') return body
+function setCors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+}
 
-  if (Object.prototype.hasOwnProperty.call(body, 'topK')) {
-    body.topK = clampTopK(body.topK)
-  }
-  if (Object.prototype.hasOwnProperty.call(body, 'top_k')) {
-    body.top_k = clampTopK(body.top_k)
-  }
-  if (body.retrieval && typeof body.retrieval === 'object') {
-    if (Object.prototype.hasOwnProperty.call(body.retrieval, 'topK')) {
-      body.retrieval.topK = clampTopK(body.retrieval.topK)
+function parseBody(req) {
+  if (!req?.body) return {}
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body)
+    } catch {
+      return {}
     }
-    if (Object.prototype.hasOwnProperty.call(body.retrieval, 'top_k')) {
-      body.retrieval.top_k = clampTopK(body.retrieval.top_k)
-    }
   }
-
-  return body
+  return req.body
 }
 
-function clampMessageContent(content, clampContext) {
-  if (typeof content === 'string') return clampContext(content)
+export default async function handler(req, res) {
+  setCors(res)
 
-  if (Array.isArray(content)) {
-    return content.map((item) => {
-      if (!item || typeof item !== 'object') return item
-      if (typeof item.text === 'string') {
-        return { ...item, text: clampContext(item.text) }
-      }
-      if (typeof item.content === 'string') {
-        return { ...item, content: clampContext(item.content) }
-      }
-      return item
-    })
-  }
-
-  if (content && typeof content === 'object' && typeof content.text === 'string') {
-    return { ...content, text: clampContext(content.text) }
-  }
-
-  return content
-}
-
-function clampContextFields(body, clampContext) {
-  if (!body || typeof body !== 'object') return body
-
-  if (typeof body.context === 'string') body.context = clampContext(body.context)
-  if (typeof body.appendedContext === 'string') body.appendedContext = clampContext(body.appendedContext)
-
-  if (Array.isArray(body.messages)) {
-    body.messages = body.messages.map((msg) => {
-      if (!msg || typeof msg !== 'object') return msg
-      if (typeof msg.content === 'undefined') return msg
-      return { ...msg, content: clampMessageContent(msg.content, clampContext) }
-    })
-  }
-
-  if (typeof body.input === 'string') body.input = clampContext(body.input)
-  if (Array.isArray(body.input)) {
-    body.input = body.input.map((item) => {
-      if (!item || typeof item !== 'object') return item
-      if (typeof item.content === 'string') {
-        return { ...item, content: clampContext(item.content) }
-      }
-      return item
-    })
-  }
-
-  return body
-}
-
-export default async function handler(req) {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    })
+    res.status(204).end()
+    return
+  }
+
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' })
+    return
   }
 
   const startedAt = Date.now()
   const route = '/api/chat'
+  const aiProvider = String(process.env.AI_PROVIDER || 'openai').trim().toLowerCase()
   let status = 500
   let success = false
-  let retryAttempts = 0
   let userKey = getUserKey(req)
   let releaseLock = async () => {}
 
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
   try {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) {
-      status = 500
-      success = false
-      return new Response(JSON.stringify({ error: 'OPENAI_API_KEY missing on server' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    if (aiProvider === 'openai') {
+      const key = process.env.OPENAI_API_KEY
+      if (!key) {
+        status = 500
+        res.status(500).json({ error: 'OPENAI_API_KEY missing on server' })
+        return
+      }
     }
 
-    const body = await req.json()
-    const guard = await guardAiRequest({
-      req,
-      body,
-      userKey,
-      routeName: route,
-    })
+    const body = parseBody(req)
+    const {
+      userMessage,
+      context,
+      classCode,
+      conversationId,
+      attachments = [],
+    } = body || {}
 
+    const guard = await guardAiRequest({ req, body, userKey, routeName: route })
     userKey = guard.userKey
     releaseLock = guard.release
 
     if (!guard.ok) {
       status = guard.status
-      return new Response(guard.message, {
-        status: guard.status,
-        headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'Access-Control-Allow-Origin': '*',
-        },
-      })
+      res.status(guard.status).setHeader('Content-Type', 'text/plain; charset=utf-8')
+      res.send(guard.message)
+      return
     }
 
-    const safeBody = clampContextFields(clampTopKFields(cloneBody(body), guard.clampTopK), guard.clampContext)
+    const userId = await verifyAuth(req)
+    if (!userId) {
+      status = 401
+      res.status(401).json({ error: 'Unauthorized' })
+      return
+    }
 
-    const retryResult = await callWithOpenAIRetry(
-      () =>
-        fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${key}`,
-          },
-          body: JSON.stringify(safeBody),
-        }),
-      {
-        routeName: route,
-        userKey,
-      }
-    )
+    const normalizedClassCode = normalizeClassCode(classCode)
+    if (!normalizedClassCode) {
+      status = 400
+      res.status(400).json({ error: 'classCode is required' })
+      return
+    }
 
-    const upstream = retryResult.response
-    retryAttempts = retryResult.retryAttempts
+    const safeContext = guard.clampContext(context ?? '')
+    const promptUserMessage = buildPromptUserMessage(userMessage, attachments)
+    if (!String(promptUserMessage || '').trim()) {
+      status = 400
+      res.status(400).json({ error: 'userMessage is required' })
+      return
+    }
 
-    const data = await upstream.json().catch(() => ({}))
-    status = upstream.status
-    success = upstream.ok
-
-    return new Response(JSON.stringify(data), {
-      status: upstream.status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
+    const historyForPrompt = await getPromptHistory({
+      userId,
+      classCode: normalizedClassCode,
+      conversationId,
     })
-  } catch (e) {
+
+    const provider = await getProvider()
+    const text = await provider.complete({
+      systemPrompt: undefined,
+      context: safeContext,
+      history: historyForPrompt,
+      userMessage: promptUserMessage,
+      options: { userKey },
+    })
+
+    const persisted = await appendConversationTurn({
+      userId,
+      classCode: normalizedClassCode,
+      conversationId,
+      userMessage,
+      assistantMessage: text,
+      attachments,
+    })
+    const conversation = persisted?.preview || null
+
+    status = 200
+    success = true
+
+    res.status(200).json({
+      choices: [{ message: { content: text } }],
+      conversation,
+    })
+  } catch (error) {
     status = 500
     success = false
-    return new Response(JSON.stringify({ error: 'Proxy failed', detail: String(e) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    res.status(500).json({ error: 'Chat request failed', detail: String(error) })
   } finally {
     await releaseLock()
     const durationMs = Date.now() - startedAt
     console.info(JSON.stringify({
       event: 'ai_chat_request',
+      provider: process.env.AI_PROVIDER || 'openai',
       route,
       userKey,
       durationMs,
       success,
       status,
-      retryAttempts,
     }))
   }
 }

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom'
-import { SignedIn, SignedOut, SignInButton, useUser } from '@clerk/clerk-react'
+import { SignedIn, useUser } from '@clerk/clerk-react'
 import Teacher from './pages/Teacher'
 import Student from './pages/Student'
 import ClassChat from './pages/ClassChat'
@@ -13,7 +13,7 @@ import { getUserRole, canAccessTeacherArea, canAccessStudentArea, canAccessAdmin
 
 function HomePage() {
   const navigate = useNavigate()
-  const { user, isLoaded } = useUser()
+  const { user } = useUser()
 
   const handleTeacherClick = () => {
     if (user) {
@@ -158,22 +158,28 @@ function HomePage() {
 function SyncUser() {
   const { user, isLoaded } = useUser()
   const navigate = useNavigate()
+  const role = getUserRole(user)
 
   React.useEffect(() => {
-    if (isLoaded && user) {
-      const role = getUserRole(user)
+    if (!isLoaded) return
+
+    if (!user) {
+      navigate('/', { replace: true })
+      return
+    }
+
+    if (role) {
       if (role === 'teacher' || role === 'admin') {
         navigate('/teacher', { replace: true })
       } else if (role === 'student') {
         navigate('/student', { replace: true })
-      } else {
-        // No role yet, let the RoleSelector handle it on a protected route
-        navigate('/', { replace: true })
       }
-    } else if (isLoaded && !user) {
-      navigate('/', { replace: true })
     }
-  }, [isLoaded, user, navigate])
+  }, [isLoaded, navigate, role, user])
+
+  if (isLoaded && user && !role) {
+    return <RoleSelector />
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

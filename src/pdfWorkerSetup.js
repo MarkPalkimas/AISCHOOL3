@@ -6,5 +6,3 @@ GlobalWorkerOptions.workerSrc = new URL(
     'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
     import.meta.url
 ).toString()
-
-console.log('PDF Worker Configured:', GlobalWorkerOptions.workerSrc)

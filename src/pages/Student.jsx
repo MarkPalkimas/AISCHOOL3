@@ -174,12 +174,8 @@ function Student() {
       </aside>
 
       <main className="workspace-main">
-        <header className="workspace-main__header">
-          <div>
-            <p className="workspace-main__eyebrow">AI tutor access</p>
-            <h1>Class conversations built around your materials</h1>
-            <p>Open a class, ask grounded questions, and keep recent study threads organized in one place.</p>
-          </div>
+        <header className="workspace-main__header workspace-main__header--compact">
+          <h1>Classes</h1>
         </header>
 
         <section className="workspace-main__body">
@@ -218,23 +214,28 @@ function Student() {
                   <div className="workspace-card__footer workspace-card__footer--actions">
                     <button
                       type="button"
-                      className="workspace-card__link"
+                      className="workspace-icon-button workspace-icon-button--primary"
                       onClick={() => handleClassClick(classItem.code)}
+                      aria-label={`Open AI tutor for ${classItem.name}`}
+                      title="Open AI tutor"
                     >
-                      <span>Open AI tutor</span>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
                     <button
                       type="button"
-                      className="btn-ghost-danger"
+                      className="workspace-icon-button workspace-icon-button--danger"
                       onClick={() => {
                         setLeaveError('')
                         setPendingLeaveClass(classItem)
                       }}
+                      aria-label={`Leave ${classItem.name}`}
+                      title="Leave class"
                     >
-                      Leave Class
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h11.25" />
+                      </svg>
                     </button>
                   </div>
                 </div>

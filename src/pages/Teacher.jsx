@@ -521,12 +521,8 @@ function Teacher() {
       </aside>
 
       <main className="workspace-main">
-        <header className="workspace-main__header">
-          <div>
-            <p className="workspace-main__eyebrow">Teacher control center</p>
-            <h1>Manage class workspaces like a conversation product</h1>
-            <p>Create classes, upload materials, and keep every tutor workspace clean, grounded, and ready for students.</p>
-          </div>
+        <header className="workspace-main__header workspace-main__header--compact">
+          <h1>Classes</h1>
         </header>
 
         <section className="workspace-main__body">
@@ -584,8 +580,16 @@ function Teacher() {
                     </div>
 
                     <div className="workspace-card__actions">
-                      <button type="button" className="btn-secondary" onClick={() => openUploadModal(classItem)}>
-                        {hasMaterials ? 'Manage Materials' : 'Upload Materials'}
+                      <button
+                        type="button"
+                        className="workspace-icon-button workspace-icon-button--primary"
+                        onClick={() => openUploadModal(classItem)}
+                        aria-label={`${hasMaterials ? 'Manage materials for' : 'Upload materials to'} ${classItem.name}`}
+                        title={hasMaterials ? 'Manage materials' : 'Upload materials'}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 16.5V9.75m0 0l-3 3m3-3l3 3M4.5 19.5h15A1.5 1.5 0 0021 18V6a1.5 1.5 0 00-1.5-1.5h-15A1.5 1.5 0 003 6v12a1.5 1.5 0 001.5 1.5z" />
+                        </svg>
                       </button>
                     </div>
                   </div>
@@ -675,17 +679,20 @@ function Teacher() {
             )}
 
             <div className="modal-field">
-              <label className="modal-label">Upload Files</label>
+              <label className="modal-label">Files</label>
               <div className="modal-inline-row">
                 <button
                   type="button"
                   onClick={handleChooseFiles}
-                  className="btn-secondary"
+                  className="workspace-icon-button workspace-icon-button--soft"
                   disabled={isUploading || isLoadingMaterials}
+                  aria-label="Add files"
+                  title="Add files"
                 >
-                  Add Files
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
                 </button>
-                <span className="modal-helper">PDFs, DOCX, TXT, CSV/XLSX, JSON, images, and more. Video uploads stay disabled.</span>
               </div>
               <input
                 ref={fileInputRef}
@@ -746,10 +753,14 @@ function Teacher() {
                       <button
                         type="button"
                         onClick={() => handleDeleteMaterial(material.id)}
-                        className="btn-secondary"
+                        className="workspace-icon-button workspace-icon-button--danger"
                         disabled={isUploading}
+                        aria-label={`Remove ${material.name}`}
+                        title="Remove"
                       >
-                        Remove
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M18.16 19.673A2.25 2.25 0 0115.916 21H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .563c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
                       </button>
                     </div>
                   ))}
@@ -764,10 +775,14 @@ function Teacher() {
                   setDeleteError('')
                   setPendingDeleteClass(selectedClass)
                 }}
-                className="btn-ghost-danger btn-ghost-danger--compact"
+                className="workspace-icon-button workspace-icon-button--danger"
                 disabled={isUploading || isLoadingMaterials || isDeletingClass}
+                aria-label="Delete class"
+                title="Delete class"
               >
-                Delete Class
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M18.16 19.673A2.25 2.25 0 0115.916 21H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .563c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
               </button>
               <button
                 type="button"

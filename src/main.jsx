@@ -1,0 +1,17 @@
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
+import App from './App.jsx'
+import ClerkProviderWithRouter from './ClerkProviderWithRouter.jsx'
+import './pdfWorkerSetup' // Configure PDF.js worker
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <ClerkProviderWithRouter>
+        <App />
+      </ClerkProviderWithRouter>
+    </BrowserRouter>
+  </React.StrictMode>
+)

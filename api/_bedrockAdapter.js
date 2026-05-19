@@ -2,7 +2,7 @@
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime'
 import { buildStructuredUserTurn, SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from './_openaiAdapter.js'
 
-const DEFAULT_MODEL_ID = 'anthropic.claude-haiku-4-5-20251001-v1:0'
+const DEFAULT_MODEL_ID = 'us.anthropic.claude-haiku-4-5-v1:0'
 let loggedConfig = false
 
 function readEnv(name) {
@@ -21,15 +21,19 @@ function getCredentialMode(accessKeyId) {
  * @returns {boolean}
  */
 function isValidModelId(modelId) {
-  // Format: provider.model-name-version-v1:0
+  // Format 1: Inference Profile ARN (newer models): us.provider.model-name-version
+  // Format 2: Direct Model ID (legacy): provider.model-name-version-v1:0
   // Examples:
-  // - anthropic.claude-haiku-4-5-20251001-v1:0
-  // - anthropic.claude-3-sonnet-20240229-v1:0
-  // - meta.llama3-70b-instruct-v1:0
-  // - amazon.titan-text-express-v1
+  // - us.anthropic.claude-haiku-4-5-v1:0 (inference profile)
+  // - us.anthropic.claude-3-5-sonnet-v2:0 (inference profile)
+  // - anthropic.claude-3-haiku-20240307-v1:0 (direct model ID)
+  // - us.meta.llama3-3-70b-instruct-v1:0 (inference profile)
+  // - us.amazon.nova-micro-v1:0 (inference profile)
   
-  const pattern = /^(anthropic|meta|amazon)\.[a-z0-9-]+(-v\d+)?(:0)?$/i
-  return pattern.test(modelId)
+  const inferenceProfilePattern = /^us\.(anthropic|meta|amazon)\.[a-z0-9-]+(-v\d+)?(:0)?$/i
+  const directModelPattern = /^(anthropic|meta|amazon)\.[a-z0-9-]+(-v\d+)?(:0)?$/i
+  
+  return inferenceProfilePattern.test(modelId) || directModelPattern.test(modelId)
 }
 
 function logBedrockConfigOnce({ accessKeyId, secretAccessKey, sessionToken, region, modelId }) {

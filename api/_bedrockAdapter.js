@@ -2,7 +2,7 @@
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime'
 import { buildStructuredUserTurn, SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from './_openaiAdapter.js'
 
-const DEFAULT_MODEL_ID = 'us.anthropic.claude-haiku-4-5-v1:0'
+const DEFAULT_MODEL_ID = 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
 let loggedConfig = false
 
 function readEnv(name) {
